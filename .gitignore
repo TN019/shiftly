@@ -1,0 +1,38 @@
+# Swift / SwiftPM
+ShiftFlowApp/.build/
+.build/
+.swiftpm/
+Packages/
+
+# Xcode (if you generate or open a project)
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Runtime data (tracked template: data/config.example.json)
+data/config.json
+data/swaps.json
+data/leave.json
+data/meta.json
+data/logs/
+data/meta.history_imported
+
+# Optional local history export (path configurable in config)
+History.csv
+
+# Editor / misc
+*.swp
+*~

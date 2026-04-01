@@ -1,0 +1,9 @@
+{
+  "calendar_name": "Shifts",
+  "event_title": "Work Schedule",
+  "default_start_time": "10:00",
+  "default_end_time": "18:30",
+  "history_csv": "History.csv",
+  "setup_completed": false,
+  "rules": []
+}
