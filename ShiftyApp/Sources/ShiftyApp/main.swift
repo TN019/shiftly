@@ -2,12 +2,73 @@ import SwiftUI
 import Foundation
 import AppKit
 
-private let rootPath = "/Users/tn/Dev/Local/ShiftFlow"
-private let configPath = "\(rootPath)/data/config.json"
-private let swapsPath = "\(rootPath)/data/swaps.json"
-private let leavePath = "\(rootPath)/data/leave.json"
-private let syncScriptPath = "\(rootPath)/scripts/sync.applescript"
-private let metaPath = "\(rootPath)/data/meta.json"
+struct ShiftyPaths {
+    static let shared = ShiftyPaths()
+
+    let root: String
+
+    private init() {
+        root = Self.resolveRoot()
+    }
+
+    var isValid: Bool { !root.isEmpty }
+
+    var configPath: String { "\(root)/data/config.json" }
+    var swapsPath: String { "\(root)/data/swaps.json" }
+    var leavePath: String { "\(root)/data/leave.json" }
+    var syncScriptPath: String { "\(root)/scripts/sync.applescript" }
+    var metaPath: String { "\(root)/data/meta.json" }
+    var workHistoryScript: String { "\(root)/scripts/work_history.py" }
+
+    private static func resolveRoot() -> String {
+        if let e = Self.rootFromEnvironment() {
+            return e
+        }
+        if let r = findRepoRoot(from: executableDirectory()) {
+            return r
+        }
+        if let r = findRepoRoot(from: URL(fileURLWithPath: #filePath).deletingLastPathComponent()) {
+            return r
+        }
+        return ""
+    }
+
+    private static func rootFromEnvironment() -> String? {
+        for key in ["SHIFTY_ROOT", "SHIFTFLOW_ROOT"] {
+            if let e = ProcessInfo.processInfo.environment[key], !e.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return (e as NSString).standardizingPath
+            }
+        }
+        return nil
+    }
+
+    private static func executableDirectory() -> URL {
+        let path = Bundle.main.executablePath
+            ?? ProcessInfo.processInfo.arguments.first
+            ?? "/"
+        return URL(fileURLWithPath: path).deletingLastPathComponent().standardizedFileURL
+    }
+
+    private static func findRepoRoot(from start: URL) -> String? {
+        var url = start.standardizedFileURL
+        for _ in 0..<16 {
+            let example = url.appendingPathComponent("data/config.example.json")
+            let cfg = url.appendingPathComponent("data/config.json")
+            if FileManager.default.fileExists(atPath: example.path) || FileManager.default.fileExists(atPath: cfg.path) {
+                return url.path
+            }
+            let parent = url.deletingLastPathComponent()
+            if parent.path == url.path { break }
+            url = parent
+        }
+        return nil
+    }
+
+    static func applyRepoRootEnvironment(_ env: inout [String: String], root: String) {
+        env["SHIFTY_ROOT"] = root
+        env["SHIFTFLOW_ROOT"] = root
+    }
+}
 
 struct Rule: Codable {
     var effective_from: String
@@ -15,6 +76,7 @@ struct Rule: Codable {
 }
 
 struct Config: Codable {
+    var config_version: Int?
     var calendar_name: String
     var event_title: String
     var default_start_time: String
@@ -47,6 +109,41 @@ enum SyncState {
     case error(String)
 }
 
+struct WorkHistoryRow: Codable, Identifiable {
+    var id: String { ymd }
+    let ymd: String
+    let ordinal: Int
+}
+
+enum WorkHistoryScriptRunner {
+    static func run(root: String, scriptPath: String) -> (rows: [WorkHistoryRow], note: String) {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        proc.arguments = [scriptPath]
+        var env = ProcessInfo.processInfo.environment
+        ShiftyPaths.applyRepoRootEnvironment(&env, root: root)
+        proc.environment = env
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        proc.standardOutput = outPipe
+        proc.standardError = errPipe
+        do {
+            try proc.run()
+            proc.waitUntilExit()
+            let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+            let errText = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            if proc.terminationStatus != 0 {
+                return ([], errText.isEmpty ? "work_history.py failed." : errText.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+            let rows = try JSONDecoder().decode([WorkHistoryRow].self, from: outData)
+            return (rows, "")
+        } catch {
+            return ([], error.localizedDescription)
+        }
+    }
+
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     @Published var selectedDays: Set<String> = []
@@ -64,6 +161,10 @@ final class AppModel: ObservableObject {
     @Published var statusMessage = ""
     @Published var isBusy = false
     @Published var busyMessage = ""
+    @Published var workHistory: [WorkHistoryRow] = []
+    @Published var workHistoryNote = ""
+
+    private let paths = ShiftyPaths.shared
 
     let dayOrder = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
     let dayLabels: [String: String] = [
@@ -71,10 +172,15 @@ final class AppModel: ObservableObject {
     ]
 
     func load() {
+        guard paths.isValid else {
+            statusMessage = "Set SHIFTY_ROOT (or legacy SHIFTFLOW_ROOT), or run from the repo so data/config.json can be found."
+            return
+        }
         loadConfig()
         loadSwaps()
         loadLeaves()
         loadMeta()
+        refreshWorkHistory()
     }
 
     func saveSchedule() {
@@ -85,10 +191,11 @@ final class AppModel: ObservableObject {
             config.default_start_time = startTime
             config.default_end_time = endTime
             config.setup_completed = true
+            if config.config_version == nil { config.config_version = 1 }
             config.rules = [
                 Rule(effective_from: df.string(from: effectiveFrom), workdays: dayOrder.filter { selectedDays.contains($0) })
             ]
-            try writeJSON(config, to: configPath)
+            try writeJSON(config, to: paths.configPath)
             syncState = .unsynced
             statusMessage = "Schedule saved."
         } catch {
@@ -102,7 +209,7 @@ final class AppModel: ObservableObject {
             let df = DateFormatter()
             df.dateFormat = "yyyy-MM-dd"
             list.append(SwapItem(from_date: df.string(from: swapFrom), to_date: df.string(from: swapTo)))
-            try writeJSON(list.map { ["from_date": $0.from_date, "to_date": $0.to_date] }, to: swapsPath)
+            try writeJSON(list.map { ["from_date": $0.from_date, "to_date": $0.to_date] }, to: paths.swapsPath)
             swaps = list
             syncState = .unsynced
             statusMessage = "Swap added."
@@ -117,7 +224,7 @@ final class AppModel: ObservableObject {
             let df = DateFormatter()
             df.dateFormat = "yyyy-MM-dd"
             list.append(LeaveItem(start_date: df.string(from: leaveStart), end_date: df.string(from: leaveEnd)))
-            try writeJSON(list.map { ["start_date": $0.start_date, "end_date": $0.end_date] }, to: leavePath)
+            try writeJSON(list.map { ["start_date": $0.start_date, "end_date": $0.end_date] }, to: paths.leavePath)
             leaves = list
             syncState = .unsynced
             statusMessage = "Leave added."
@@ -130,7 +237,7 @@ final class AppModel: ObservableObject {
         guard swaps.indices.contains(index) else { return }
         swaps.remove(at: index)
         do {
-            try writeJSON(swaps.map { ["from_date": $0.from_date, "to_date": $0.to_date] }, to: swapsPath)
+            try writeJSON(swaps.map { ["from_date": $0.from_date, "to_date": $0.to_date] }, to: paths.swapsPath)
             syncState = .unsynced
         } catch {
             statusMessage = "Delete swap failed: \(error.localizedDescription)"
@@ -141,7 +248,7 @@ final class AppModel: ObservableObject {
         guard leaves.indices.contains(index) else { return }
         leaves.remove(at: index)
         do {
-            try writeJSON(leaves.map { ["start_date": $0.start_date, "end_date": $0.end_date] }, to: leavePath)
+            try writeJSON(leaves.map { ["start_date": $0.start_date, "end_date": $0.end_date] }, to: paths.leavePath)
             syncState = .unsynced
         } catch {
             statusMessage = "Delete leave failed: \(error.localizedDescription)"
@@ -150,14 +257,22 @@ final class AppModel: ObservableObject {
 
     func syncNow() {
         guard !isBusy else { return }
+        guard paths.isValid else {
+            statusMessage = "Cannot sync: repo path not resolved."
+            return
+        }
         isBusy = true
         busyMessage = "Syncing with Calendar…"
-        let path = syncScriptPath
+        let path = paths.syncScriptPath
+        let root = paths.root
         Task { @MainActor in
             let outcome: (ok: Bool, err: String) = await Task.detached(priority: .userInitiated) {
                 let proc = Process()
                 proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
                 proc.arguments = [path]
+                var env = ProcessInfo.processInfo.environment
+                ShiftyPaths.applyRepoRootEnvironment(&env, root: root)
+                proc.environment = env
                 let pipe = Pipe()
                 proc.standardError = pipe
                 do {
@@ -178,6 +293,7 @@ final class AppModel: ObservableObject {
                 syncState = .synced
                 statusMessage = "Synced."
                 loadMeta()
+                refreshWorkHistory()
             } else {
                 syncState = .error(outcome.err)
                 statusMessage = "Sync failed."
@@ -210,6 +326,10 @@ final class AppModel: ObservableObject {
     private func loadConfig() {
         do {
             let config = try readConfig()
+            if config.calendar_name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                statusMessage = "Config invalid: calendar_name is empty."
+                return
+            }
             startTime = config.default_start_time
             endTime = config.default_end_time
             if let first = config.rules.first {
@@ -217,6 +337,9 @@ final class AppModel: ObservableObject {
                 let df = DateFormatter()
                 df.dateFormat = "yyyy-MM-dd"
                 effectiveFrom = df.date(from: first.effective_from) ?? Date()
+            }
+            if let v = config.config_version, v > 1 {
+                statusMessage = "Warning: config_version \(v) is newer than this app supports."
             }
         } catch {
             statusMessage = "Config load failed."
@@ -231,25 +354,42 @@ final class AppModel: ObservableObject {
         leaves = (try? readLeaves()) ?? []
     }
 
+    func refreshWorkHistory() {
+        guard paths.isValid else {
+            workHistory = []
+            workHistoryNote = ""
+            return
+        }
+        let root = paths.root
+        let script = paths.workHistoryScript
+        Task { @MainActor in
+            let result = await Task.detached(priority: .utility) {
+                WorkHistoryScriptRunner.run(root: root, scriptPath: script)
+            }.value
+            workHistory = result.rows
+            workHistoryNote = result.note
+        }
+    }
+
     private func loadMeta() {
-        guard let data = FileManager.default.contents(atPath: metaPath),
+        guard let data = FileManager.default.contents(atPath: paths.metaPath),
               let meta = try? JSONDecoder().decode(Meta.self, from: data) else { return }
         lastSyncText = meta.last_sync_at.isEmpty ? "-" : meta.last_sync_at
         if meta.last_sync_status == "success" { syncState = .synced }
     }
 
     private func readConfig() throws -> Config {
-        let data = try Data(contentsOf: URL(fileURLWithPath: configPath))
+        let data = try Data(contentsOf: URL(fileURLWithPath: paths.configPath))
         return try JSONDecoder().decode(Config.self, from: data)
     }
 
     private func readSwaps() throws -> [SwapItem] {
-        let data = try Data(contentsOf: URL(fileURLWithPath: swapsPath))
+        let data = try Data(contentsOf: URL(fileURLWithPath: paths.swapsPath))
         return try JSONDecoder().decode([SwapItem].self, from: data)
     }
 
     private func readLeaves() throws -> [LeaveItem] {
-        let data = try Data(contentsOf: URL(fileURLWithPath: leavePath))
+        let data = try Data(contentsOf: URL(fileURLWithPath: paths.leavePath))
         return try JSONDecoder().decode([LeaveItem].self, from: data)
     }
 
@@ -264,11 +404,58 @@ final class AppModel: ObservableObject {
 struct ContentView: View {
     @StateObject private var model = AppModel()
     @FocusState private var timeFocus: TimeField?
+    @FocusState private var historySearchFocused: Bool
     @State private var overridesListExpanded = false
+    @State private var historyExpanded = false
+    @State private var historyDateSearch = ""
+    @State private var historyPeriod: HistoryPeriodFilter = .all
+    @State private var historyRangeFrom = Date()
+    @State private var historyRangeTo = Date()
+    @State private var historyWeekdayFilter: Set<Int> = []
+    @State private var historyNewestFirst = false
+    @State private var historyActiveTool: HistoryTool? = nil
 
     private enum TimeField: Hashable {
         case start
         case end
+    }
+
+    private enum HistoryTool: Int, CaseIterable, Identifiable {
+        case period
+        case sort
+        case quick
+        case search
+        case weekday
+
+        var id: Int { rawValue }
+
+        var systemImage: String {
+            switch self {
+            case .period: return "line.3.horizontal.decrease.circle"
+            case .sort: return "arrow.up.arrow.down"
+            case .quick: return "bolt.fill"
+            case .search: return "magnifyingglass"
+            case .weekday: return "slider.horizontal.3"
+            }
+        }
+
+        var helpText: String {
+            switch self {
+            case .period: return "Time period"
+            case .sort: return "Sort order"
+            case .quick: return "Quick range"
+            case .search: return "Search by date"
+            case .weekday: return "Weekday"
+            }
+        }
+    }
+
+    private enum HistoryPeriodFilter: String, CaseIterable, Identifiable {
+        case all = "All time"
+        case thisWeek = "This week"
+        case thisMonth = "This month"
+        case custom = "Custom range"
+        var id: String { rawValue }
     }
 
     private var startOfToday: Date {
@@ -309,6 +496,65 @@ struct ContentView: View {
         visibleSwaps.count + visibleLeaves.count
     }
 
+    private var historyPeriodBounds: (start: Date, end: Date)? {
+        let cal = Calendar.current
+        let today = Date()
+        switch historyPeriod {
+        case .all:
+            return nil
+        case .thisWeek:
+            guard let iv = cal.dateInterval(of: .weekOfYear, for: today) else { return nil }
+            let s = cal.startOfDay(for: iv.start)
+            guard let last = cal.date(byAdding: .day, value: 6, to: s) else { return nil }
+            return (s, cal.startOfDay(for: last))
+        case .thisMonth:
+            let c = cal.dateComponents([.year, .month], from: today)
+            guard let monthStart = cal.date(from: c),
+                  let monthRange = cal.range(of: .day, in: .month, for: monthStart),
+                  let endDay = cal.date(byAdding: .day, value: monthRange.count - 1, to: monthStart) else { return nil }
+            return (cal.startOfDay(for: monthStart), cal.startOfDay(for: endDay))
+        case .custom:
+            let a = cal.startOfDay(for: historyRangeFrom)
+            let b = cal.startOfDay(for: historyRangeTo)
+            return a <= b ? (a, b) : (b, a)
+        }
+    }
+
+    private func historyRowDate(_ row: WorkHistoryRow) -> Date? {
+        localDateFromISO(row.ymd)
+    }
+
+    private func historyDateInPeriod(_ row: WorkHistoryRow) -> Bool {
+        guard let bounds = historyPeriodBounds else { return true }
+        guard let d = historyRowDate(row) else { return false }
+        let cal = Calendar.current
+        let ds = cal.startOfDay(for: d)
+        return ds >= bounds.start && ds <= bounds.end
+    }
+
+    private var filteredWorkHistory: [WorkHistoryRow] {
+        var rows = model.workHistory
+        let q = historyDateSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !q.isEmpty {
+            rows = rows.filter { $0.ymd.localizedCaseInsensitiveContains(q) }
+        }
+        rows = rows.filter { historyDateInPeriod($0) }
+        if !historyWeekdayFilter.isEmpty {
+            rows = rows.filter { row in
+                guard let d = historyRowDate(row) else { return false }
+                let wd = Calendar.current.component(.weekday, from: d)
+                return historyWeekdayFilter.contains(wd)
+            }
+        }
+        return rows.sorted { a, b in
+            guard let da = historyRowDate(a), let db = historyRowDate(b) else {
+                return a.ymd < b.ymd
+            }
+            if historyNewestFirst { return da > db }
+            return da < db
+        }
+    }
+
     var body: some View {
         ZStack {
             LinearGradient(
@@ -323,6 +569,7 @@ struct ContentView: View {
                     header
                     weeklySection
                     overridesSection
+                    historySection
                     actions
                     if !model.statusMessage.isEmpty {
                         Text(model.statusMessage)
@@ -389,13 +636,13 @@ struct ContentView: View {
 
     private func resignAllFocus() {
         timeFocus = nil
-        NSApp.keyWindow?.makeFirstResponder(nil)
+        historySearchFocused = false
     }
 
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 3) {
-                Text("ShiftFlow").font(.title2).bold()
+                Text("Shifty").font(.title2).bold()
                 Text("Shifts calendar scheduler")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -570,6 +817,218 @@ struct ContentView: View {
         .environment(\.isEnabled, !model.isBusy)
     }
 
+    private var historySection: some View {
+        card("") {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .center, spacing: 10) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            historyExpanded.toggle()
+                            if !historyExpanded {
+                                historyActiveTool = nil
+                                historySearchFocused = false
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: historyExpanded ? "chevron.down" : "chevron.right")
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 14, alignment: .center)
+                            Text("Work History")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    Spacer(minLength: 0)
+                    Button("Refresh") {
+                        model.refreshWorkHistory()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(model.isBusy || !ShiftyPaths.shared.isValid)
+                }
+
+                if historyExpanded {
+                    HStack {
+                        Spacer(minLength: 0)
+                        HStack(spacing: 4) {
+                            ForEach(HistoryTool.allCases) { tool in
+                                historyToolIconButton(tool)
+                            }
+                        }
+                    }
+
+                    if let tool = historyActiveTool {
+                        historyToolPanel(tool)
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(Color.white.opacity(0.06))
+                            )
+                    }
+
+                    if !model.workHistoryNote.isEmpty {
+                        Text(model.workHistoryNote)
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+
+                    if model.workHistory.isEmpty && model.workHistoryNote.isEmpty && ShiftyPaths.shared.isValid {
+                        Text("No entries.")
+                            .font(.subheadline)
+                            .foregroundStyle(.tertiary)
+                    } else if !model.workHistory.isEmpty && filteredWorkHistory.isEmpty {
+                        Text("No matches for current filters.")
+                            .font(.subheadline)
+                            .foregroundStyle(.tertiary)
+                    } else if !filteredWorkHistory.isEmpty {
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 4) {
+                                ForEach(filteredWorkHistory) { row in
+                                    HStack(spacing: 12) {
+                                        Text("Day \(row.ordinal)")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.tertiary)
+                                            .frame(width: 72, alignment: .leading)
+                                        Text(row.ymd)
+                                            .font(.system(.body, design: .rounded).monospacedDigit())
+                                        Spacer(minLength: 0)
+                                        Text(weekdayLabel(forYMD: row.ymd))
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .padding(.vertical, 6)
+                                    .padding(.horizontal, 10)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .fill(Color.white.opacity(0.05))
+                                    )
+                                }
+                            }
+                        }
+                        .frame(maxHeight: 240)
+                    }
+                }
+            }
+        }
+        .environment(\.isEnabled, !model.isBusy)
+    }
+
+    private func historyToolIconButton(_ tool: HistoryTool) -> some View {
+        let on = historyActiveTool == tool
+        return Button {
+            if historyActiveTool == tool {
+                historyActiveTool = nil
+                historySearchFocused = false
+            } else {
+                historyActiveTool = tool
+                if tool == .search {
+                    DispatchQueue.main.async {
+                        NSApp.activate(ignoringOtherApps: true)
+                        historySearchFocused = true
+                    }
+                } else {
+                    historySearchFocused = false
+                }
+            }
+        } label: {
+            Image(systemName: tool.systemImage)
+                .font(.system(size: 14, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(on ? Color.accentColor : Color.secondary)
+                .frame(width: 30, height: 26)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(on ? Color.accentColor.opacity(0.18) : Color.white.opacity(0.05))
+                )
+        }
+        .buttonStyle(.plain)
+        .help(tool.helpText)
+    }
+
+    @ViewBuilder
+    private func historyToolPanel(_ tool: HistoryTool) -> some View {
+        switch tool {
+        case .period:
+            HStack(alignment: .center, spacing: 10) {
+                Text("Range").font(.caption).foregroundStyle(.secondary)
+                Picker("Range", selection: $historyPeriod) {
+                    ForEach(HistoryPeriodFilter.allCases) { p in
+                        Text(p.rawValue).tag(p)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(minWidth: 140, alignment: .leading)
+                if historyPeriod == .custom {
+                    Text("From").font(.caption).foregroundStyle(.secondary)
+                    styledDatePicker($historyRangeFrom)
+                    Text("To").font(.caption).foregroundStyle(.secondary)
+                    styledDatePicker($historyRangeTo)
+                }
+                Spacer(minLength: 0)
+            }
+        case .sort:
+            HStack(spacing: 10) {
+                Text("Order").font(.caption).foregroundStyle(.secondary)
+                Picker("", selection: $historyNewestFirst) {
+                    Text("Oldest first").tag(false)
+                    Text("Newest first").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 360)
+                Spacer(minLength: 0)
+            }
+        case .quick:
+            HStack(spacing: 8) {
+                Button("This week") { historyPeriod = .thisWeek }
+                    .buttonStyle(.bordered)
+                Button("This month") { historyPeriod = .thisMonth }
+                    .buttonStyle(.bordered)
+                Button("All time") { historyPeriod = .all }
+                    .buttonStyle(.bordered)
+                Spacer(minLength: 0)
+            }
+        case .search:
+            TextField("Search by date (e.g. 2026-04)", text: $historyDateSearch)
+                .textFieldStyle(.roundedBorder)
+                .focused($historySearchFocused)
+                .frame(maxWidth: .infinity)
+        case .weekday:
+            HStack(spacing: 6) {
+                ForEach(0 ..< 7, id: \.self) { idx in
+                    let wd = idx + 1
+                    let sym = Calendar.current.shortStandaloneWeekdaySymbols[wd - 1]
+                    let on = historyWeekdayFilter.contains(wd)
+                    Button(sym) {
+                        if on { historyWeekdayFilter.remove(wd) } else { historyWeekdayFilter.insert(wd) }
+                    }
+                    .buttonStyle(.plain)
+                    .font(.system(.caption2, design: .rounded).weight(.semibold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(on ? Color.accentColor : Color.secondary.opacity(0.16), in: Capsule())
+                    .foregroundStyle(on ? Color.white : Color.primary)
+                }
+            }
+        }
+    }
+
+    private func weekdayLabel(forYMD ymd: String) -> String {
+        let parts = ymd.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3 else { return "—" }
+        var comps = DateComponents()
+        comps.year = parts[0]
+        comps.month = parts[1]
+        comps.day = parts[2]
+        guard let date = Calendar.current.date(from: comps) else { return "—" }
+        let f = DateFormatter()
+        f.locale = .current
+        f.dateFormat = "EEEE"
+        return f.string(from: date)
+    }
+
     @ViewBuilder
     private func overrideSwapRow(idx: Int, item: SwapItem) -> some View {
         HStack(spacing: 8) {
@@ -740,8 +1199,22 @@ struct ContentView: View {
     }
 }
 
+final class ShiftyAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.windows.first?.makeKeyAndOrderFront(nil)
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        true
+    }
+}
+
 @main
-struct ShiftFlowAppMain: App {
+struct ShiftyAppMain: App {
+    @NSApplicationDelegateAdaptor(ShiftyAppDelegate.self) private var appDelegate
+
     var body: some Scene {
         WindowGroup {
             ContentView()

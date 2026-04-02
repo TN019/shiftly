@@ -1,10 +1,26 @@
 use scripting additions
 
-property projectRoot : "/Users/tn/Dev/Local/ShiftFlow"
+property projectRoot : ""
 property historyImportedMarker : "/data/meta.history_imported"
 
+on getProjectRoot()
+	try
+		set e to do shell script "if [ -n \"$SHIFTY_ROOT\" ]; then printf %s \"$SHIFTY_ROOT\"; elif [ -n \"$SHIFTFLOW_ROOT\" ]; then printf %s \"$SHIFTFLOW_ROOT\"; fi"
+		if e is not "" then return e
+	end try
+	try
+		set mePath to POSIX path of (path to me)
+		set scriptsDir to do shell script "/usr/bin/dirname " & quoted form of mePath
+		set rootDir to do shell script "/usr/bin/dirname " & quoted form of scriptsDir
+		return rootDir
+	on error errMsg
+		error ("Shifty: could not resolve project root. Set SHIFTY_ROOT or SHIFTFLOW_ROOT. " & errMsg) number -1700
+	end try
+end getProjectRoot
+
 on run
-  set cfg to my readConfig()
+	set projectRoot to my getProjectRoot()
+	set cfg to my readConfig()
   set calendarName to calendar_name of cfg
   set eventTitle to event_title of cfg
   set shiftStart to default_start_time of cfg
@@ -167,11 +183,11 @@ end getRangeYmdForPeriod
 on getSyncRangeYmd()
   set py to "import os,datetime" & linefeed & ¬
     "import json,pathlib" & linefeed & ¬
-    "root=pathlib.Path('/Users/tn/Dev/Local/ShiftFlow')" & linefeed & ¬
+    "root=pathlib.Path(os.environ['SHIFTFLOW_ROOT'])" & linefeed & ¬
     "swaps=json.loads((root/'data/swaps.json').read_text()) if (root/'data/swaps.json').exists() else []" & linefeed & ¬
     "leave=json.loads((root/'data/leave.json').read_text()) if (root/'data/leave.json').exists() else []" & linefeed & ¬
     "today=datetime.date.today()" & linefeed & ¬
-    "mode=os.environ.get('SHIFTFLOW_SYNC_MODE','')" & linefeed & ¬
+    "mode=(os.environ.get('SHIFTY_SYNC_MODE') or os.environ.get('SHIFTFLOW_SYNC_MODE') or '')" & linefeed & ¬
     "if mode=='next_month':" & linefeed & ¬
     "  if today.month==12:" & linefeed & ¬
     "    first=datetime.date(today.year+1,1,1)" & linefeed & ¬
@@ -200,15 +216,15 @@ on getSyncRangeYmd()
     "last=max_override" & linefeed & ¬
     "print(first.isoformat())" & linefeed & ¬
     "print(last.isoformat())" & linefeed
-  set outText to do shell script "/usr/bin/python3 -c " & quoted form of py
+  set outText to do shell script "export SHIFTY_ROOT=" & quoted form of projectRoot & " && export SHIFTFLOW_ROOT=" & quoted form of projectRoot & " && /usr/bin/python3 -c " & quoted form of py
   set linesList to paragraphs of outText
   if (count of linesList) is less than 2 then error "sync range"
   return {item 1 of linesList, item 2 of linesList}
 end getSyncRangeYmd
 
 on runPlannerPython(startYmd, endYmd)
-  set py to "import json,datetime,pathlib" & linefeed & ¬
-    "root=pathlib.Path('/Users/tn/Dev/Local/ShiftFlow')" & linefeed & ¬
+  set py to "import json,datetime,pathlib,os" & linefeed & ¬
+    "root=pathlib.Path(os.environ['SHIFTFLOW_ROOT'])" & linefeed & ¬
     "cfg=json.loads((root/'data/config.json').read_text())" & linefeed & ¬
     "swaps=json.loads((root/'data/swaps.json').read_text())" & linefeed & ¬
     "leave=json.loads((root/'data/leave.json').read_text())" & linefeed & ¬
@@ -248,7 +264,7 @@ on runPlannerPython(startYmd, endYmd)
     "    x+=datetime.timedelta(days=1)" & linefeed & ¬
     "for d in sorted(shifts): print(d.isoformat()+'|auto')" & linefeed
 
-  return do shell script "/usr/bin/python3 -c " & quoted form of py
+  return do shell script "export SHIFTY_ROOT=" & quoted form of projectRoot & " && export SHIFTFLOW_ROOT=" & quoted form of projectRoot & " && /usr/bin/python3 -c " & quoted form of py
 end runPlannerPython
 
 on splitByPipe(t)
@@ -286,8 +302,8 @@ on pad2(n)
 end pad2
 
 on readConfig()
-  set py to "import json,pathlib;cfg=json.loads(pathlib.Path('/Users/tn/Dev/Local/ShiftFlow/data/config.json').read_text());print(cfg.get('calendar_name','Shifts'));print(cfg.get('event_title','Work Schedule'));print(cfg.get('default_start_time','10:00'));print(cfg.get('default_end_time','18:30'))"
-  set outText to do shell script "/usr/bin/python3 -c " & quoted form of py
+  set py to "import json,pathlib,os;root=pathlib.Path(os.environ['SHIFTFLOW_ROOT']);cfg=json.loads((root/'data/config.json').read_text());print(cfg.get('calendar_name','Shifts'));print(cfg.get('event_title','Work Schedule'));print(cfg.get('default_start_time','10:00'));print(cfg.get('default_end_time','18:30'))"
+  set outText to do shell script "export SHIFTY_ROOT=" & quoted form of projectRoot & " && export SHIFTFLOW_ROOT=" & quoted form of projectRoot & " && /usr/bin/python3 -c " & quoted form of py
   set linesList to paragraphs of outText
   if (count of linesList) < 4 then error "invalid config"
   return {calendar_name:item 1 of linesList, event_title:item 2 of linesList, default_start_time:item 3 of linesList, default_end_time:item 4 of linesList}

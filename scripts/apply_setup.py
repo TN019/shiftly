@@ -12,6 +12,7 @@ if cfg_path.exists():
     cfg = json.loads(cfg_path.read_text())
 else:
     cfg = {
+        "config_version": 1,
         "calendar_name": "Shifts",
         "event_title": "Work Schedule",
         "history_csv": "History.csv",
@@ -24,4 +25,6 @@ cfg["rules"] = [
     {"effective_from": datetime.date.today().isoformat(), "workdays": data["workdays"]}
 ]
 cfg["setup_completed"] = True
+if "config_version" not in cfg:
+    cfg["config_version"] = 1
 cfg_path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")

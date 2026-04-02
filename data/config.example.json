@@ -1,4 +1,5 @@
 {
+  "config_version": 1,
   "calendar_name": "Shifts",
   "event_title": "Work Schedule",
   "default_start_time": "10:00",

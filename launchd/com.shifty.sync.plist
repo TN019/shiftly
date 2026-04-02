@@ -3,16 +3,22 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.shiftflow.sync</string>
+  <string>com.shifty.sync</string>
 
   <key>ProgramArguments</key>
   <array>
     <string>/usr/bin/osascript</string>
-    <string>/Users/tn/Dev/Local/ShiftFlow/scripts/sync.applescript</string>
+    <string>/CHANGE_ME/Shifty/scripts/sync.applescript</string>
   </array>
 
   <key>EnvironmentVariables</key>
   <dict>
+    <key>SHIFTY_ROOT</key>
+    <string>/CHANGE_ME/Shifty</string>
+    <key>SHIFTFLOW_ROOT</key>
+    <string>/CHANGE_ME/Shifty</string>
+    <key>SHIFTY_SYNC_MODE</key>
+    <string>next_month</string>
     <key>SHIFTFLOW_SYNC_MODE</key>
     <string>next_month</string>
   </dict>
@@ -28,10 +34,10 @@
   </dict>
 
   <key>StandardOutPath</key>
-  <string>/Users/tn/Dev/Local/ShiftFlow/data/logs/launchd.out.log</string>
+  <string>/CHANGE_ME/Shifty/data/logs/launchd.out.log</string>
 
   <key>StandardErrorPath</key>
-  <string>/Users/tn/Dev/Local/ShiftFlow/data/logs/launchd.err.log</string>
+  <string>/CHANGE_ME/Shifty/data/logs/launchd.err.log</string>
 
   <key>RunAtLoad</key>
   <false/>

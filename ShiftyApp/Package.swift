@@ -2,16 +2,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "ShiftFlowApp",
+    name: "ShiftyApp",
     platforms: [
         .macOS(.v13)
     ],
     products: [
-        .executable(name: "ShiftFlowApp", targets: ["ShiftFlowApp"])
+        .executable(name: "ShiftyApp", targets: ["ShiftyApp"])
     ],
     targets: [
         .executableTarget(
-            name: "ShiftFlowApp",
+            name: "ShiftyApp",
             path: "Sources"
         )
     ]
