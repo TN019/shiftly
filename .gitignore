@@ -32,6 +32,7 @@ data/meta.history_imported
 
 # Optional local history export (path configurable in config)
 History.csv
+data/
 
 # Editor / misc
 *.swp
