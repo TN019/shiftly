@@ -11,8 +11,10 @@
 - 仓库：`TN019/shiftly`（原 shifty，GitHub 已改名）。feature 分支开发，push + 建 PR 都允许，
   **但绝不执行 PR 合并**——合并永远留给用户。
 - commit：一句话，`feat:/fix:/chore:/refactor:/docs:/test:` 前缀（参考 git log 既有格式）；
-  author 设为 Claude（`--author="Claude Fable 5 <noreply@anthropic.com>"`）。
-- PR 描述：**背景 / 改动 / 验证** 三段；Claude 为 co-author。
+  author/committer 用默认 git 身份（用户本人），消息末尾加
+  `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>` trailer。
+- PR 描述：**背景 / 改动 / 验证** 三段；PR 归 Claude（保留 Generated with Claude Code 页脚），
+  不写用户为 co-author。
 - 代码质量：自测后再交；无法自测的（如真实日历交互）在 PR 里写清让用户测什么、怎么测、预期效果。
 - 拿不准的事先问用户，不要擅自决定。
 
@@ -36,11 +38,18 @@
 ## 当前代码布局（v1，重构前）
 
 ```
-ShiftlyApp/Sources/ShiftlyApp/main.swift SwiftUI 单文件应用（1225 行，M1 要拆分）
+ShiftlyApp/Sources/ShiftlyKit/           领域核心（无 SwiftUI/AppKit）：Models、Paths、
+                                         ConfigLogic、DataStore、ScriptRunners
+ShiftlyApp/Sources/ShiftlyApp/           App：AppMain、AppModel、ContentView、
+                                         OverridesViews、HistoryViews
+ShiftlyApp/Tests/ShiftlyKitTests/        Swift Testing（import Testing，非 XCTest——
+                                         本机只有 CLT，跑法见 scripts/test.sh）
 scripts/schedule_core.py                 排班核心（Python，规则+换班+请假求解）
+scripts/planner.py                       AppleScript 唯一的 Python 入口（CLI）
 scripts/sync.applescript                 现行同步引擎（AppleScript，M2 用 EventKit 替代）
 scripts/main.applescript                 AppleScript 菜单入口
 scripts/{report,work_history,apply_setup,needs_setup}.py   辅助脚本
+scripts/test.sh                          一键跑全部测试（python + applescript + swift）
 data/                                    JSON 数据（整目录 gitignore，schema 见 DATA_AND_API.md）
 launchd/com.shiftly.sync.plist           定时同步模板
 ```
@@ -49,7 +58,7 @@ launchd/com.shiftly.sync.plist           定时同步模板
 
 ```bash
 cd ShiftlyApp && swift run               # 跑 GUI
-python3 scripts/test_schedule_core.py -v # Python 核心测试
+scripts/test.sh                          # 全部测试（--fast 跳过 swift）
 osascript scripts/sync.applescript       # 手动同步（旧链路）
 ```
 
