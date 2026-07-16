@@ -330,19 +330,28 @@ on csvCol(rowText, colIndex)
 end csvCol
 
 on parseDateTime(ymdHm)
+  return my parseDateTimeFrom(current date, ymdHm)
+end parseDateTime
+
+-- baseDate is injectable so tests can simulate any "today"
+-- (see scripts/test_date_rollover.applescript).
+on parseDateTimeFrom(baseDate, ymdHm)
   set y to (text 1 thru 4 of ymdHm) as integer
   set m to (text 6 thru 7 of ymdHm) as integer
   set d to (text 9 thru 10 of ymdHm) as integer
   set hh to (text 12 thru 13 of ymdHm) as integer
   set mm to (text 15 thru 16 of ymdHm) as integer
 
-  set dt to current date
+  copy baseDate to dt
+  -- Reset day to 1 first: if the base date is the 29th/30th/31st and the
+  -- target month is shorter, setting month would overflow into the next month.
+  set day of dt to 1
   set year of dt to y
   set month of dt to my monthFromNum(m)
   set day of dt to d
   set time of dt to (hh * hours) + (mm * minutes)
   return dt
-end parseDateTime
+end parseDateTimeFrom
 
 on monthFromNum(mm)
   if mm is 1 then return January
