@@ -37,3 +37,6 @@ data/
 # Editor / misc
 *.swp
 *~
+
+# App bundle output
+dist/
