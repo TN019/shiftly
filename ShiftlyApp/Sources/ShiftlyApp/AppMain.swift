@@ -89,15 +89,24 @@ struct Config: Codable {
 }
 
 struct SwapItem: Codable, Identifiable {
-    var id: UUID { UUID() }
+    // Stable in-memory identity; not part of the JSON file format.
+    var id = UUID()
     var from_date: String
     var to_date: String
+
+    private enum CodingKeys: String, CodingKey {
+        case from_date, to_date
+    }
 }
 
 struct LeaveItem: Codable, Identifiable {
-    var id: UUID { UUID() }
+    var id = UUID()
     var start_date: String
     var end_date: String
+
+    private enum CodingKeys: String, CodingKey {
+        case start_date, end_date
+    }
 }
 
 struct Meta: Codable {
@@ -165,6 +174,7 @@ final class AppModel: ObservableObject {
     @Published var busyMessage = ""
     @Published var workHistory: [WorkHistoryRow] = []
     @Published var workHistoryNote = ""
+    @Published var rulesSummary = ""
 
     private let paths = ShiftlyPaths.shared
 
@@ -187,17 +197,23 @@ final class AppModel: ObservableObject {
 
     func saveSchedule() {
         do {
-            var config = try readConfig()
             let df = DateFormatter()
             df.dateFormat = "yyyy-MM-dd"
-            config.default_start_time = startTime
-            config.default_end_time = endTime
-            config.setup_completed = true
-            if config.config_version == nil { config.config_version = 1 }
-            config.rules = [
-                Rule(effective_from: df.string(from: effectiveFrom), workdays: dayOrder.filter { selectedDays.contains($0) })
-            ]
-            try writeJSON(config, to: paths.configPath)
+            // Merge into the raw dictionary: unknown keys survive, and the
+            // rule history is upserted instead of overwritten.
+            let raw = try ConfigLogic.readRawConfig(atPath: paths.configPath)
+            let merged = ConfigLogic.mergeSchedule(
+                into: raw,
+                startTime: startTime,
+                endTime: endTime,
+                effectiveFrom: df.string(from: effectiveFrom),
+                workdays: dayOrder.filter { selectedDays.contains($0) }
+            )
+            try ConfigLogic.writeRawConfig(merged, toPath: paths.configPath)
+            rulesSummary = Self.rulesSummary(from: (merged["rules"] as? [[String: Any]])?.compactMap {
+                guard let ef = $0["effective_from"] as? String else { return nil }
+                return Rule(effective_from: ef, workdays: ($0["workdays"] as? [String]) ?? [])
+            } ?? [])
             syncState = .unsynced
             statusMessage = "Schedule saved."
         } catch {
@@ -211,7 +227,7 @@ final class AppModel: ObservableObject {
             let df = DateFormatter()
             df.dateFormat = "yyyy-MM-dd"
             list.append(SwapItem(from_date: df.string(from: swapFrom), to_date: df.string(from: swapTo)))
-            try writeJSON(list.map { ["from_date": $0.from_date, "to_date": $0.to_date] }, to: paths.swapsPath)
+            try writeJSON(list, to: paths.swapsPath)
             swaps = list
             syncState = .unsynced
             statusMessage = "Swap added."
@@ -226,7 +242,7 @@ final class AppModel: ObservableObject {
             let df = DateFormatter()
             df.dateFormat = "yyyy-MM-dd"
             list.append(LeaveItem(start_date: df.string(from: leaveStart), end_date: df.string(from: leaveEnd)))
-            try writeJSON(list.map { ["start_date": $0.start_date, "end_date": $0.end_date] }, to: paths.leavePath)
+            try writeJSON(list, to: paths.leavePath)
             leaves = list
             syncState = .unsynced
             statusMessage = "Leave added."
@@ -235,22 +251,22 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func deleteSwap(index: Int) {
-        guard swaps.indices.contains(index) else { return }
-        swaps.remove(at: index)
+    func deleteSwap(id: UUID) {
+        guard swaps.contains(where: { $0.id == id }) else { return }
+        swaps.removeAll { $0.id == id }
         do {
-            try writeJSON(swaps.map { ["from_date": $0.from_date, "to_date": $0.to_date] }, to: paths.swapsPath)
+            try writeJSON(swaps, to: paths.swapsPath)
             syncState = .unsynced
         } catch {
             statusMessage = "Delete swap failed: \(error.localizedDescription)"
         }
     }
 
-    func deleteLeave(index: Int) {
-        guard leaves.indices.contains(index) else { return }
-        leaves.remove(at: index)
+    func deleteLeave(id: UUID) {
+        guard leaves.contains(where: { $0.id == id }) else { return }
+        leaves.removeAll { $0.id == id }
         do {
-            try writeJSON(leaves.map { ["start_date": $0.start_date, "end_date": $0.end_date] }, to: paths.leavePath)
+            try writeJSON(leaves, to: paths.leavePath)
             syncState = .unsynced
         } catch {
             statusMessage = "Delete leave failed: \(error.localizedDescription)"
@@ -334,12 +350,15 @@ final class AppModel: ObservableObject {
             }
             startTime = config.default_start_time
             endTime = config.default_end_time
-            if let first = config.rules.first {
-                selectedDays = Set(first.workdays)
+            let sorted = config.rules.sorted { $0.effective_from < $1.effective_from }
+            // Edit the newest rule; older ones are history and must be kept.
+            if let latest = sorted.last {
+                selectedDays = Set(latest.workdays)
                 let df = DateFormatter()
                 df.dateFormat = "yyyy-MM-dd"
-                effectiveFrom = df.date(from: first.effective_from) ?? Date()
+                effectiveFrom = df.date(from: latest.effective_from) ?? Date()
             }
+            rulesSummary = Self.rulesSummary(from: sorted)
             if let v = config.config_version, v > 1 {
                 statusMessage = "Warning: config_version \(v) is newer than this app supports."
             }
@@ -378,6 +397,15 @@ final class AppModel: ObservableObject {
               let meta = try? JSONDecoder().decode(Meta.self, from: data) else { return }
         lastSyncText = meta.last_sync_at.isEmpty ? "-" : meta.last_sync_at
         if meta.last_sync_status == "success" { syncState = .synced }
+    }
+
+    private static func rulesSummary(from rules: [Rule]) -> String {
+        let sorted = rules.sorted { $0.effective_from < $1.effective_from }
+        guard let latest = sorted.last else { return "" }
+        if sorted.count == 1 {
+            return "1 rule · effective from \(latest.effective_from)"
+        }
+        return "\(sorted.count) rules · latest effective from \(latest.effective_from)"
     }
 
     private func readConfig() throws -> Config {
@@ -486,12 +514,12 @@ struct ContentView: View {
         return end < startOfToday
     }
 
-    private var visibleSwaps: [(Int, SwapItem)] {
-        model.swaps.enumerated().filter { !isSwapPast($0.element) }.map { ($0.offset, $0.element) }
+    private var visibleSwaps: [SwapItem] {
+        model.swaps.filter { !isSwapPast($0) }
     }
 
-    private var visibleLeaves: [(Int, LeaveItem)] {
-        model.leaves.enumerated().filter { !isLeavePast($0.element) }.map { ($0.offset, $0.element) }
+    private var visibleLeaves: [LeaveItem] {
+        model.leaves.filter { !isLeavePast($0) }
     }
 
     private var overridesVisibleCount: Int {
@@ -673,6 +701,11 @@ struct ContentView: View {
 
     private var weeklySection: some View {
         card("Weekly Schedule") {
+            if !model.rulesSummary.isEmpty {
+                Text(model.rulesSummary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             HStack {
                 ForEach(model.dayOrder, id: \.self) { code in
                     let isSelected = model.selectedDays.contains(code)
@@ -793,11 +826,11 @@ struct ContentView: View {
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 10) {
-                            ForEach(visibleSwaps, id: \.0) { idx, item in
-                                overrideSwapRow(idx: idx, item: item)
+                            ForEach(visibleSwaps) { item in
+                                overrideSwapRow(item: item)
                             }
-                            ForEach(visibleLeaves, id: \.0) { idx, item in
-                                overrideLeaveRow(idx: idx, item: item)
+                            ForEach(visibleLeaves) { item in
+                                overrideLeaveRow(item: item)
                             }
                         }
                         .padding(.vertical, 6)
@@ -1032,7 +1065,7 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private func overrideSwapRow(idx: Int, item: SwapItem) -> some View {
+    private func overrideSwapRow(item: SwapItem) -> some View {
         HStack(spacing: 8) {
             Text("Swap")
                 .font(.caption.weight(.semibold))
@@ -1049,7 +1082,7 @@ struct ContentView: View {
                 .font(.system(.body, design: .rounded).weight(.medium).monospacedDigit())
             Spacer()
             Button(role: .destructive) {
-                model.deleteSwap(index: idx)
+                model.deleteSwap(id: item.id)
             } label: {
                 Image(systemName: "trash")
             }
@@ -1065,7 +1098,7 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private func overrideLeaveRow(idx: Int, item: LeaveItem) -> some View {
+    private func overrideLeaveRow(item: LeaveItem) -> some View {
         HStack(spacing: 8) {
             Text("Leave")
                 .font(.caption.weight(.semibold))
@@ -1082,7 +1115,7 @@ struct ContentView: View {
                 .font(.system(.body, design: .rounded).weight(.medium).monospacedDigit())
             Spacer()
             Button(role: .destructive) {
-                model.deleteLeave(index: idx)
+                model.deleteLeave(id: item.id)
             } label: {
                 Image(systemName: "trash")
             }
