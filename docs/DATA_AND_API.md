@@ -45,11 +45,18 @@
 ```
 
 ```jsonc
-// manual_shifts.json（M2 回读产物）：单次班次（非规则生成）
-[ { "date": "2026-07-20", "shift_type": "day", "start": "12:00", "end": "20:00", "source": "calendar" } ]
+// manual_shifts.json（M2 回读产物，已实现）：单次班次（非规则生成）
+[ { "date": "2026-07-20", "start": "12:00", "end": "20:00", "source": "calendar" } ]
 
-// sync_state.json（M2）：事件映射，见 docs/SYNC_DESIGN.md §2
+// overrides.json（M2 回读产物，已实现）：单日时间覆盖（用户在日历改了当天时间）
+[ { "date": "2026-07-21", "start": "12:00", "end": "20:00" } ]
+
+// sync_state.json（M2，已实现）：事件映射，见 docs/SYNC_DESIGN.md §2；
+// 引擎私有状态，勿手改（连同 meta.json）
 ```
+
+注：日历侧删除事件会回读为 leave.json 中的单日请假（start_date == end_date）。
+meta.json 增加可选字段 `last_sync_error`（同步失败时记录原因）。
 
 **工作日志（M5）**：不在 `data/` 内，存于用户指定目录（默认 `~/Documents/ShiftlyLogs`），
 路径记入 `config.json` 的 `log_dir`（App 端用 security-scoped bookmark 持久授权）。

@@ -20,7 +20,18 @@ let package = Package(
         .executableTarget(
             name: "ShiftlyApp",
             dependencies: ["ShiftlyKit"],
-            path: "Sources/ShiftlyApp"
+            path: "Sources/ShiftlyApp",
+            exclude: ["Info.plist"],
+            linkerSettings: [
+                // Embed Info.plist (calendar permission strings) so the bare
+                // executable can prompt for EventKit access on its own.
+                .unsafeFlags([
+                    "-Xlinker", "-sectcreate",
+                    "-Xlinker", "__TEXT",
+                    "-Xlinker", "__info_plist",
+                    "-Xlinker", "Sources/ShiftlyApp/Info.plist",
+                ])
+            ]
         ),
         .testTarget(
             name: "ShiftlyKitTests",

@@ -30,28 +30,6 @@ public enum WorkHistoryScriptRunner {
     }
 }
 
-/// Runs `scripts/sync.applescript` via osascript.
-/// Blocking — call off the main thread.
-public enum SyncScriptRunner {
-    public static func run(root: String, scriptPath: String) -> (ok: Bool, err: String) {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-        proc.arguments = [scriptPath]
-        var env = ProcessInfo.processInfo.environment
-        ShiftlyPaths.applyRepoRootEnvironment(&env, root: root)
-        proc.environment = env
-        let pipe = Pipe()
-        proc.standardError = pipe
-        do {
-            try proc.run()
-            proc.waitUntilExit()
-            if proc.terminationStatus == 0 {
-                return (true, "")
-            }
-            let msg = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "sync error"
-            return (false, msg)
-        } catch {
-            return (false, error.localizedDescription)
-        }
-    }
-}
+// The osascript-based SyncScriptRunner was removed together with the app's
+// AppleScript sync path; the AppleScript menu (scripts/main.applescript)
+// still invokes sync.applescript directly for the legacy flow.

@@ -30,6 +30,10 @@ public struct DataStore {
         return try? JSONDecoder().decode(Meta.self, from: data)
     }
 
+    public func saveMeta(_ meta: Meta) throws {
+        try writeJSON(meta, to: paths.metaPath)
+    }
+
     // MARK: Writes
 
     public func saveSwaps(_ swaps: [SwapItem]) throws {

@@ -1,3 +1,5 @@
+import AppKit
+import EventKit
 import Foundation
 import ShiftlyKit
 
@@ -112,6 +114,8 @@ final class AppModel: ObservableObject {
         }
     }
 
+    @Published var showSettingsHint = false
+
     func syncNow() {
         guard !isBusy else { return }
         guard paths.isValid else {
@@ -120,24 +124,60 @@ final class AppModel: ObservableObject {
         }
         isBusy = true
         busyMessage = "Syncing with Calendar…"
-        let path = paths.syncScriptPath
+        showSettingsHint = false
         let root = paths.root
         Task { @MainActor in
-            let outcome = await Task.detached(priority: .userInitiated) {
-                SyncScriptRunner.run(root: root, scriptPath: path)
-            }.value
-            isBusy = false
-            busyMessage = ""
-            if outcome.ok {
+            defer {
+                isBusy = false
+                busyMessage = ""
+            }
+            let ekStore = EKEventStore()
+            guard await CalendarAccess.request(using: ekStore) else {
+                syncState = .error("calendar access denied")
+                statusMessage = "Calendar access denied. Grant access in System Settings → Privacy & Security → Calendars, then sync again."
+                showSettingsHint = true
+                return
+            }
+            do {
+                let outcome = try await Task.detached(priority: .userInitiated) {
+                    let store = DataStore()
+                    let config = try store.loadConfig()
+                    let calendar = try EKCalendarStore.locateOrCreateCalendar(
+                        named: config.calendar_name, in: ekStore
+                    )
+                    let coordinator = SyncCoordinator(
+                        store: store,
+                        stateStore: SyncStateStore(),
+                        calendar: EKCalendarStore(eventStore: ekStore, calendar: calendar),
+                        provider: PlannerScriptProvider(root: root)
+                    )
+                    return try coordinator.sync()
+                }.value
+                load()
                 syncState = .synced
-                statusMessage = "Synced."
+                statusMessage = Self.syncSummary(outcome)
+            } catch {
+                syncState = .error(String(describing: error))
+                statusMessage = "Sync failed: \(error)"
                 loadMeta()
-                refreshWorkHistory()
-            } else {
-                syncState = .error(outcome.err)
-                statusMessage = "Sync failed."
             }
         }
+    }
+
+    func openCalendarPrivacySettings() {
+        if let url = URL(string: CalendarAccess.settingsURLString) {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    private static func syncSummary(_ outcome: SyncOutcome) -> String {
+        var parts: [String] = []
+        if outcome.created > 0 { parts.append("\(outcome.created) created") }
+        if outcome.updated > 0 { parts.append("\(outcome.updated) updated") }
+        if outcome.deleted > 0 { parts.append("\(outcome.deleted) removed") }
+        if !outcome.readbacks.isEmpty { parts.append("\(outcome.readbacks.count) read back from Calendar") }
+        if parts.isEmpty { return "Synced. Already up to date." }
+        return "Synced: " + parts.joined(separator: ", ") + "."
     }
 
     func saveScheduleAndSync() {

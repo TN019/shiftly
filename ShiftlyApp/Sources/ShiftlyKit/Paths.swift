@@ -9,6 +9,11 @@ public struct ShiftlyPaths {
         root = Self.resolveRoot()
     }
 
+    /// Explicit-root paths, for tests and tools operating on a chosen root.
+    public init(root: String) {
+        self.root = root
+    }
+
     public var isValid: Bool { !root.isEmpty }
 
     public var configPath: String { "\(root)/data/config.json" }
