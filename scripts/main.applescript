@@ -4,7 +4,7 @@ property projectRoot : ""
 
 on getProjectRoot()
 	try
-		set e to do shell script "if [ -n \"$SHIFTY_ROOT\" ]; then printf %s \"$SHIFTY_ROOT\"; elif [ -n \"$SHIFTFLOW_ROOT\" ]; then printf %s \"$SHIFTFLOW_ROOT\"; fi"
+		set e to do shell script "if [ -n \"$SHIFTLY_ROOT\" ]; then printf %s \"$SHIFTLY_ROOT\"; elif [ -n \"$SHIFTY_ROOT\" ]; then printf %s \"$SHIFTY_ROOT\"; elif [ -n \"$SHIFTFLOW_ROOT\" ]; then printf %s \"$SHIFTFLOW_ROOT\"; fi"
 		if e is not "" then return e
 	end try
 	try
@@ -13,7 +13,7 @@ on getProjectRoot()
 		set rootDir to do shell script "/usr/bin/dirname " & quoted form of scriptsDir
 		return rootDir
 	on error errMsg
-		error ("Shifty: could not resolve project root. Set SHIFTY_ROOT or SHIFTFLOW_ROOT. " & errMsg) number -1700
+		error ("Shiftly: could not resolve project root. Set SHIFTLY_ROOT (legacy SHIFTY_ROOT/SHIFTFLOW_ROOT also accepted). " & errMsg) number -1700
 	end try
 end getProjectRoot
 
@@ -26,7 +26,7 @@ on run
 
   set options to {"Schedule", "Overrides", "Sync", "Reports", "Exit"}
   repeat
-    set picked to choose from list options with prompt "Choose a section." with title "Shifty" default items {"Sync"}
+    set picked to choose from list options with prompt "Choose a section." with title "Shiftly" default items {"Sync"}
     if picked is false then exit repeat
 
     set choice to item 1 of picked
@@ -46,7 +46,7 @@ end run
 
 on scheduleMenu()
   set options to {"Set Work Schedule...", "View Current Rules", "Back"}
-  set picked to choose from list options with prompt "Schedule actions" with title "Shifty / Schedule" default items {"Set Work Schedule..."}
+  set picked to choose from list options with prompt "Schedule actions" with title "Shiftly / Schedule" default items {"Set Work Schedule..."}
   if picked is false then return
   set choice to item 1 of picked
   if choice is "Set Work Schedule..." then
@@ -59,7 +59,7 @@ end scheduleMenu
 
 on overridesMenu()
   set options to {"Add Swap", "Add Leave", "Back"}
-  set picked to choose from list options with prompt "Override actions" with title "Shifty / Overrides" default items {"Add Swap"}
+  set picked to choose from list options with prompt "Override actions" with title "Shiftly / Overrides" default items {"Add Swap"}
   if picked is false then return
   set choice to item 1 of picked
   if choice is "Add Swap" then
@@ -71,12 +71,12 @@ end overridesMenu
 
 on syncMenu()
   set options to {"Sync Now", "View Sync Log", "Back"}
-  set picked to choose from list options with prompt "Sync actions" with title "Shifty / Sync" default items {"Sync Now"}
+  set picked to choose from list options with prompt "Sync actions" with title "Shiftly / Sync" default items {"Sync Now"}
   if picked is false then return
   set choice to item 1 of picked
   if choice is "Sync Now" then
     try
-      do shell script "export SHIFTY_ROOT=" & quoted form of projectRoot & " && export SHIFTFLOW_ROOT=" & quoted form of projectRoot & " && /usr/bin/osascript " & quoted form of (projectRoot & "/scripts/sync.applescript")
+      do shell script "export SHIFTLY_ROOT=" & quoted form of projectRoot & " && export SHIFTY_ROOT=" & quoted form of projectRoot & " && export SHIFTFLOW_ROOT=" & quoted form of projectRoot & " && /usr/bin/osascript " & quoted form of (projectRoot & "/scripts/sync.applescript")
       display dialog "Sync completed." buttons {"OK"} default button "OK"
     on error errText
       display dialog "Sync failed: " & errText buttons {"OK"} default button "OK"
@@ -88,7 +88,7 @@ end syncMenu
 
 on reportsMenu()
   set options to {"Weekly Hours", "Monthly Hours", "Back"}
-  set picked to choose from list options with prompt "Report actions" with title "Shifty / Reports" default items {"Weekly Hours"}
+  set picked to choose from list options with prompt "Report actions" with title "Shiftly / Reports" default items {"Weekly Hours"}
   if picked is false then return
   set choice to item 1 of picked
   if choice is "Weekly Hours" then
@@ -100,7 +100,7 @@ end reportsMenu
 
 on runSetupWizard()
   set dayChoices to {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"}
-  set picked to choose from list dayChoices with prompt "Select workdays (Cmd-click multiple):" with title "Shifty — Setup" with multiple selections allowed
+  set picked to choose from list dayChoices with prompt "Select workdays (Cmd-click multiple):" with title "Shiftly — Setup" with multiple selections allowed
   if picked is false then return
   if (count of picked) is 0 then
     display dialog "Select at least one workday." buttons {"OK"} default button "OK"
@@ -113,15 +113,15 @@ on runSetupWizard()
     set end of wdCodes to my weekdayCode(contents of d)
   end repeat
 
-  set startDialog to display dialog "Daily start time (HH:MM, e.g. 10:00):" default answer "10:00" with title "Shifty — Setup"
+  set startDialog to display dialog "Daily start time (HH:MM, e.g. 10:00):" default answer "10:00" with title "Shiftly — Setup"
   set startT to text returned of startDialog
-  set endDialog to display dialog "Daily end time (HH:MM, e.g. 18:30):" default answer "18:30" with title "Shifty — Setup"
+  set endDialog to display dialog "Daily end time (HH:MM, e.g. 18:30):" default answer "18:30" with title "Shiftly — Setup"
   set endT to text returned of endDialog
 
   set jsonPayload to my buildSetupJson(wdCodes, startT, endT)
   try
     do shell script "printf %s " & quoted form of jsonPayload & " | /usr/bin/python3 " & quoted form of (projectRoot & "/scripts/apply_setup.py")
-    display dialog "Settings saved. Use Sync Now to write your calendar." buttons {"OK"} default button "OK" with title "Shifty"
+    display dialog "Settings saved. Use Sync Now to write your calendar." buttons {"OK"} default button "OK" with title "Shiftly"
   on error errText
     display dialog "Could not save settings: " & errText buttons {"OK"} default button "OK"
   end try
@@ -207,10 +207,10 @@ end addLeave
 
 on appendSwap(fromDate, toDate)
 	set py to "import json,pathlib,datetime,os;root=pathlib.Path(os.environ['SHIFTFLOW_ROOT']);f=root/'data/swaps.json';a=json.loads(f.read_text());datetime.date.fromisoformat('" & fromDate & "');datetime.date.fromisoformat('" & toDate & "');a.append({'from_date':'" & fromDate & "','to_date':'" & toDate & "'});f.write_text(json.dumps(a,indent=2))"
-	do shell script "export SHIFTY_ROOT=" & quoted form of projectRoot & " && export SHIFTFLOW_ROOT=" & quoted form of projectRoot & " && /usr/bin/python3 -c " & quoted form of py
+	do shell script "export SHIFTLY_ROOT=" & quoted form of projectRoot & " && export SHIFTY_ROOT=" & quoted form of projectRoot & " && export SHIFTFLOW_ROOT=" & quoted form of projectRoot & " && /usr/bin/python3 -c " & quoted form of py
 end appendSwap
 
 on appendLeave(startDate, endDate)
 	set py to "import json,pathlib,datetime,os;root=pathlib.Path(os.environ['SHIFTFLOW_ROOT']);f=root/'data/leave.json';a=json.loads(f.read_text());datetime.date.fromisoformat('" & startDate & "');datetime.date.fromisoformat('" & endDate & "');a.append({'start_date':'" & startDate & "','end_date':'" & endDate & "'});f.write_text(json.dumps(a,indent=2))"
-	do shell script "export SHIFTY_ROOT=" & quoted form of projectRoot & " && export SHIFTFLOW_ROOT=" & quoted form of projectRoot & " && /usr/bin/python3 -c " & quoted form of py
+	do shell script "export SHIFTLY_ROOT=" & quoted form of projectRoot & " && export SHIFTY_ROOT=" & quoted form of projectRoot & " && export SHIFTFLOW_ROOT=" & quoted form of projectRoot & " && /usr/bin/python3 -c " & quoted form of py
 end appendLeave

@@ -2,8 +2,8 @@ import SwiftUI
 import Foundation
 import AppKit
 
-struct ShiftyPaths {
-    static let shared = ShiftyPaths()
+struct ShiftlyPaths {
+    static let shared = ShiftlyPaths()
 
     let root: String
 
@@ -34,7 +34,7 @@ struct ShiftyPaths {
     }
 
     private static func rootFromEnvironment() -> String? {
-        for key in ["SHIFTY_ROOT", "SHIFTFLOW_ROOT"] {
+        for key in ["SHIFTLY_ROOT", "SHIFTY_ROOT", "SHIFTFLOW_ROOT"] {
             if let e = ProcessInfo.processInfo.environment[key], !e.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 return (e as NSString).standardizingPath
             }
@@ -65,6 +65,8 @@ struct ShiftyPaths {
     }
 
     static func applyRepoRootEnvironment(_ env: inout [String: String], root: String) {
+        env["SHIFTLY_ROOT"] = root
+        // Legacy names kept for scripts that still read them.
         env["SHIFTY_ROOT"] = root
         env["SHIFTFLOW_ROOT"] = root
     }
@@ -121,7 +123,7 @@ enum WorkHistoryScriptRunner {
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
         proc.arguments = [scriptPath]
         var env = ProcessInfo.processInfo.environment
-        ShiftyPaths.applyRepoRootEnvironment(&env, root: root)
+        ShiftlyPaths.applyRepoRootEnvironment(&env, root: root)
         proc.environment = env
         let outPipe = Pipe()
         let errPipe = Pipe()
@@ -164,7 +166,7 @@ final class AppModel: ObservableObject {
     @Published var workHistory: [WorkHistoryRow] = []
     @Published var workHistoryNote = ""
 
-    private let paths = ShiftyPaths.shared
+    private let paths = ShiftlyPaths.shared
 
     let dayOrder = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
     let dayLabels: [String: String] = [
@@ -173,7 +175,7 @@ final class AppModel: ObservableObject {
 
     func load() {
         guard paths.isValid else {
-            statusMessage = "Set SHIFTY_ROOT (or legacy SHIFTFLOW_ROOT), or run from the repo so data/config.json can be found."
+            statusMessage = "Set SHIFTLY_ROOT (or legacy SHIFTY_ROOT/SHIFTFLOW_ROOT), or run from the repo so data/config.json can be found."
             return
         }
         loadConfig()
@@ -271,7 +273,7 @@ final class AppModel: ObservableObject {
                 proc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
                 proc.arguments = [path]
                 var env = ProcessInfo.processInfo.environment
-                ShiftyPaths.applyRepoRootEnvironment(&env, root: root)
+                ShiftlyPaths.applyRepoRootEnvironment(&env, root: root)
                 proc.environment = env
                 let pipe = Pipe()
                 proc.standardError = pipe
@@ -642,7 +644,7 @@ struct ContentView: View {
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 3) {
-                Text("Shifty").font(.title2).bold()
+                Text("Shiftly").font(.title2).bold()
                 Text("Shifts calendar scheduler")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -845,7 +847,7 @@ struct ContentView: View {
                         model.refreshWorkHistory()
                     }
                     .buttonStyle(.bordered)
-                    .disabled(model.isBusy || !ShiftyPaths.shared.isValid)
+                    .disabled(model.isBusy || !ShiftlyPaths.shared.isValid)
                 }
 
                 if historyExpanded {
@@ -874,7 +876,7 @@ struct ContentView: View {
                             .foregroundStyle(.orange)
                     }
 
-                    if model.workHistory.isEmpty && model.workHistoryNote.isEmpty && ShiftyPaths.shared.isValid {
+                    if model.workHistory.isEmpty && model.workHistoryNote.isEmpty && ShiftlyPaths.shared.isValid {
                         Text("No entries.")
                             .font(.subheadline)
                             .foregroundStyle(.tertiary)
@@ -1199,7 +1201,7 @@ struct ContentView: View {
     }
 }
 
-final class ShiftyAppDelegate: NSObject, NSApplicationDelegate {
+final class ShiftlyAppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
@@ -1212,8 +1214,8 @@ final class ShiftyAppDelegate: NSObject, NSApplicationDelegate {
 }
 
 @main
-struct ShiftyAppMain: App {
-    @NSApplicationDelegateAdaptor(ShiftyAppDelegate.self) private var appDelegate
+struct ShiftlyAppMain: App {
+    @NSApplicationDelegateAdaptor(ShiftlyAppDelegate.self) private var appDelegate
 
     var body: some Scene {
         WindowGroup {

@@ -1,4 +1,4 @@
-"""Shared schedule and work-history logic for Shifty (Python scripts)."""
+"""Shared schedule and work-history logic for Shiftly (Python scripts)."""
 from __future__ import annotations
 
 import csv
@@ -11,7 +11,12 @@ SUPPORTED_CONFIG_VERSION = 1
 
 
 def repo_root() -> Path:
-    env = (os.environ.get("SHIFTY_ROOT") or os.environ.get("SHIFTFLOW_ROOT") or "").strip()
+    env = (
+        os.environ.get("SHIFTLY_ROOT")
+        or os.environ.get("SHIFTY_ROOT")  # legacy
+        or os.environ.get("SHIFTFLOW_ROOT")  # legacy
+        or ""
+    ).strip()
     if env:
         return Path(env).expanduser().resolve()
     return Path(__file__).resolve().parent.parent
