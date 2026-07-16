@@ -36,11 +36,18 @@
 ## 当前代码布局（v1，重构前）
 
 ```
-ShiftlyApp/Sources/ShiftlyApp/main.swift SwiftUI 单文件应用（1225 行，M1 要拆分）
+ShiftlyApp/Sources/ShiftlyKit/           领域核心（无 SwiftUI/AppKit）：Models、Paths、
+                                         ConfigLogic、DataStore、ScriptRunners
+ShiftlyApp/Sources/ShiftlyApp/           App：AppMain、AppModel、ContentView、
+                                         OverridesViews、HistoryViews
+ShiftlyApp/Tests/ShiftlyKitTests/        Swift Testing（import Testing，非 XCTest——
+                                         本机只有 CLT，跑法见 scripts/test.sh）
 scripts/schedule_core.py                 排班核心（Python，规则+换班+请假求解）
+scripts/planner.py                       AppleScript 唯一的 Python 入口（CLI）
 scripts/sync.applescript                 现行同步引擎（AppleScript，M2 用 EventKit 替代）
 scripts/main.applescript                 AppleScript 菜单入口
 scripts/{report,work_history,apply_setup,needs_setup}.py   辅助脚本
+scripts/test.sh                          一键跑全部测试（python + applescript + swift）
 data/                                    JSON 数据（整目录 gitignore，schema 见 DATA_AND_API.md）
 launchd/com.shiftly.sync.plist           定时同步模板
 ```
@@ -49,7 +56,7 @@ launchd/com.shiftly.sync.plist           定时同步模板
 
 ```bash
 cd ShiftlyApp && swift run               # 跑 GUI
-python3 scripts/test_schedule_core.py -v # Python 核心测试
+scripts/test.sh                          # 全部测试（--fast 跳过 swift）
 osascript scripts/sync.applescript       # 手动同步（旧链路）
 ```
 

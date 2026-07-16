@@ -19,8 +19,21 @@ osacompile -o "$tmpdir/main.scpt" scripts/main.applescript
 echo "OK"
 
 if [[ "${1:-}" != "--fast" ]]; then
-  echo "== swift: build"
-  (cd ShiftlyApp && swift build)
+  echo "== swift: build + test"
+  # Command Line Tools ship Testing.framework outside the default search
+  # paths (and without Xcode there is no XCTest); pass them explicitly so
+  # `swift test` works on CLT-only machines. Harmless with full Xcode.
+  CLT_DEV=/Library/Developer/CommandLineTools/Library/Developer
+  SWIFT_TEST_FLAGS=()
+  if [[ -d "$CLT_DEV/Frameworks/Testing.framework" ]]; then
+    SWIFT_TEST_FLAGS=(
+      -Xswiftc -F -Xswiftc "$CLT_DEV/Frameworks"
+      -Xlinker -F -Xlinker "$CLT_DEV/Frameworks"
+      -Xlinker -rpath -Xlinker "$CLT_DEV/Frameworks"
+      -Xlinker -rpath -Xlinker "$CLT_DEV/usr/lib"
+    )
+  fi
+  (cd ShiftlyApp && swift build && swift test "${SWIFT_TEST_FLAGS[@]}")
 fi
 
 echo "ALL TESTS PASSED"

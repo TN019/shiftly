@@ -4,14 +4,14 @@ import Foundation
 ///
 /// Works on the raw JSON dictionary instead of `Config` so that keys this
 /// app version does not know about survive a save round-trip.
-enum ConfigLogic {
+public enum ConfigLogic {
     /// Merge schedule fields into the raw config dictionary.
     ///
     /// - Unknown top-level keys are preserved untouched.
     /// - The rule is upserted by `effective_from`: an existing rule with the
     ///   same date is updated in place (its unknown keys preserved too),
     ///   otherwise the new rule is appended. Rules stay sorted by date.
-    static func mergeSchedule(
+    public static func mergeSchedule(
         into raw: [String: Any],
         startTime: String,
         endTime: String,
@@ -41,7 +41,7 @@ enum ConfigLogic {
         return cfg
     }
 
-    static func readRawConfig(atPath path: String) throws -> [String: Any] {
+    public static func readRawConfig(atPath path: String) throws -> [String: Any] {
         let data = try Data(contentsOf: URL(fileURLWithPath: path))
         guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw CocoaError(.propertyListReadCorrupt)
@@ -49,7 +49,7 @@ enum ConfigLogic {
         return dict
     }
 
-    static func writeRawConfig(_ raw: [String: Any], toPath path: String) throws {
+    public static func writeRawConfig(_ raw: [String: Any], toPath path: String) throws {
         let data = try JSONSerialization.data(
             withJSONObject: raw,
             options: [.prettyPrinted, .sortedKeys]
