@@ -3,20 +3,25 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.shifty.sync</string>
+  <string>com.shiftly.sync</string>
 
   <key>ProgramArguments</key>
   <array>
     <string>/usr/bin/osascript</string>
-    <string>/CHANGE_ME/Shifty/scripts/sync.applescript</string>
+    <string>/CHANGE_ME/Shiftly/scripts/sync.applescript</string>
   </array>
 
   <key>EnvironmentVariables</key>
   <dict>
+    <key>SHIFTLY_ROOT</key>
+    <string>/CHANGE_ME/Shiftly</string>
+    <!-- Legacy names kept while scripts still read them. -->
     <key>SHIFTY_ROOT</key>
-    <string>/CHANGE_ME/Shifty</string>
+    <string>/CHANGE_ME/Shiftly</string>
     <key>SHIFTFLOW_ROOT</key>
-    <string>/CHANGE_ME/Shifty</string>
+    <string>/CHANGE_ME/Shiftly</string>
+    <key>SHIFTLY_SYNC_MODE</key>
+    <string>next_month</string>
     <key>SHIFTY_SYNC_MODE</key>
     <string>next_month</string>
     <key>SHIFTFLOW_SYNC_MODE</key>
@@ -34,10 +39,10 @@
   </dict>
 
   <key>StandardOutPath</key>
-  <string>/CHANGE_ME/Shifty/data/logs/launchd.out.log</string>
+  <string>/CHANGE_ME/Shiftly/data/logs/launchd.out.log</string>
 
   <key>StandardErrorPath</key>
-  <string>/CHANGE_ME/Shifty/data/logs/launchd.err.log</string>
+  <string>/CHANGE_ME/Shiftly/data/logs/launchd.err.log</string>
 
   <key>RunAtLoad</key>
   <false/>
