@@ -2,11 +2,14 @@
 """Read JSON from stdin: {start, end, workdays: ["MO", ...]}. Merge into data/config.json."""
 import datetime
 import json
-import pathlib
 import sys
+from pathlib import Path
 
-root = pathlib.Path(__file__).resolve().parent.parent
-cfg_path = root / "data" / "config.json"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from schedule_core import repo_root
+
+cfg_path = repo_root() / "data" / "config.json"
 data = json.load(sys.stdin)
 if cfg_path.exists():
     cfg = json.loads(cfg_path.read_text())
@@ -21,9 +24,18 @@ else:
     }
 cfg["default_start_time"] = data["start"]
 cfg["default_end_time"] = data["end"]
-cfg["rules"] = [
-    {"effective_from": datetime.date.today().isoformat(), "workdays": data["workdays"]}
-]
+
+# Upsert today's rule; never wipe the effective_from history.
+today = datetime.date.today().isoformat()
+rules = [r for r in cfg.get("rules", []) if isinstance(r, dict)]
+existing = next((r for r in rules if r.get("effective_from") == today), None)
+if existing is not None:
+    existing["workdays"] = data["workdays"]
+else:
+    rules.append({"effective_from": today, "workdays": data["workdays"]})
+rules.sort(key=lambda r: r.get("effective_from", ""))
+cfg["rules"] = rules
+
 cfg["setup_completed"] = True
 if "config_version" not in cfg:
     cfg["config_version"] = 1

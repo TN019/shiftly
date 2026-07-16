@@ -90,6 +90,41 @@ def planned_dates(cfg: dict, swaps: list, leave: list, start: dt.date, end: dt.d
     return shifts
 
 
+def month_end(day: dt.date) -> dt.date:
+    if day.month == 12:
+        return dt.date(day.year + 1, 1, 1) - dt.timedelta(days=1)
+    return dt.date(day.year, day.month + 1, 1) - dt.timedelta(days=1)
+
+
+def sync_range(swaps: list, leave: list, today: dt.date | None = None, mode: str = "") -> tuple[dt.date, dt.date]:
+    """Sync window: today..month end (or the whole next month for mode
+    'next_month'), extended to cover the latest override date."""
+    today = today or dt.date.today()
+    if mode == "next_month":
+        first = dt.date(today.year + (1 if today.month == 12 else 0),
+                        1 if today.month == 12 else today.month + 1, 1)
+        last = month_end(first)
+    else:
+        first = today
+        last = month_end(today)
+
+    def date_or_none(s):
+        try:
+            return dt.date.fromisoformat(s)
+        except (TypeError, ValueError):
+            return None
+
+    for s in swaps:
+        t = date_or_none(s.get("to_date", ""))
+        if t and t > last:
+            last = t
+    for lv in leave:
+        e = date_or_none(lv.get("end_date", ""))
+        if e and e > last:
+            last = e
+    return first, last
+
+
 def history_dates_in_range(history_csv: Path, start: dt.date, end: dt.date) -> set[dt.date]:
     if not history_csv.exists():
         return set()

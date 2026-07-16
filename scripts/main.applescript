@@ -205,12 +205,17 @@ on addLeave()
   end try
 end addLeave
 
+-- User input goes to planner.py as shell-quoted argv values — never
+-- interpolated into code. planner.py validates the dates and exits non-zero
+-- on bad input, which surfaces as the "Invalid ... input" dialog above.
+on runPlanner(argsText)
+	do shell script "export SHIFTLY_ROOT=" & quoted form of projectRoot & " && /usr/bin/python3 " & quoted form of (projectRoot & "/scripts/planner.py") & " " & argsText
+end runPlanner
+
 on appendSwap(fromDate, toDate)
-	set py to "import json,pathlib,datetime,os;root=pathlib.Path(os.environ['SHIFTFLOW_ROOT']);f=root/'data/swaps.json';a=json.loads(f.read_text());datetime.date.fromisoformat('" & fromDate & "');datetime.date.fromisoformat('" & toDate & "');a.append({'from_date':'" & fromDate & "','to_date':'" & toDate & "'});f.write_text(json.dumps(a,indent=2))"
-	do shell script "export SHIFTLY_ROOT=" & quoted form of projectRoot & " && export SHIFTY_ROOT=" & quoted form of projectRoot & " && export SHIFTFLOW_ROOT=" & quoted form of projectRoot & " && /usr/bin/python3 -c " & quoted form of py
+	my runPlanner("add-swap --from-date " & quoted form of fromDate & " --to-date " & quoted form of toDate)
 end appendSwap
 
 on appendLeave(startDate, endDate)
-	set py to "import json,pathlib,datetime,os;root=pathlib.Path(os.environ['SHIFTFLOW_ROOT']);f=root/'data/leave.json';a=json.loads(f.read_text());datetime.date.fromisoformat('" & startDate & "');datetime.date.fromisoformat('" & endDate & "');a.append({'start_date':'" & startDate & "','end_date':'" & endDate & "'});f.write_text(json.dumps(a,indent=2))"
-	do shell script "export SHIFTLY_ROOT=" & quoted form of projectRoot & " && export SHIFTY_ROOT=" & quoted form of projectRoot & " && export SHIFTFLOW_ROOT=" & quoted form of projectRoot & " && /usr/bin/python3 -c " & quoted form of py
+	my runPlanner("add-leave --start " & quoted form of startDate & " --end " & quoted form of endDate)
 end appendLeave
