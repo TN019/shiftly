@@ -15,6 +15,9 @@
   `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>` trailer。
 - PR 描述：**背景 / 改动 / 验证** 三段；PR 归 Claude（保留 Generated with Claude Code 页脚），
   不写用户为 co-author。
+- **GitHub 上的一切文字（PR 描述、评论）只做客观描述**：不出现"你/我"等对话措辞、
+  不写承诺（"下次会…""合并后我会…"）；未自动化的验证写成「未自动化验证项」小节，
+  内容为中性的操作步骤与预期。
 - 代码质量：自测后再交；无法自测的（如真实日历交互）在 PR 里写清让用户测什么、怎么测、预期效果。
 - 拿不准的事先问用户，不要擅自决定。
 
