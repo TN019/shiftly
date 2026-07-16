@@ -155,117 +155,22 @@ on generatePlannedFutureShifts(calendarName, eventTitle, shiftStart, shiftEnd, s
 end generatePlannedFutureShifts
 
 on getPlannedShiftLines(startYmd, endYmd)
-  return my runPlannerPython(startYmd, endYmd)
+  return my runPlanner("shifts --start " & quoted form of startYmd & " --end " & quoted form of endYmd)
 end getPlannedShiftLines
 
-on getRangeYmdForPeriod(periodKind)
-  set py to "import datetime" & linefeed & ¬
-    "today=datetime.date.today()" & linefeed & ¬
-    "if '" & periodKind & "'=='week':" & linefeed & ¬
-    "  start=today-datetime.timedelta(days=today.weekday())" & linefeed & ¬
-    "  end=start+datetime.timedelta(days=6)" & linefeed & ¬
-    "elif '" & periodKind & "'=='month':" & linefeed & ¬
-    "  start=datetime.date(today.year,today.month,1)" & linefeed & ¬
-    "  if today.month==12:" & linefeed & ¬
-    "    end=datetime.date(today.year+1,1,1)-datetime.timedelta(days=1)" & linefeed & ¬
-    "  else:" & linefeed & ¬
-    "    end=datetime.date(today.year,today.month+1,1)-datetime.timedelta(days=1)" & linefeed & ¬
-    "else:" & linefeed & ¬
-    "  start=today; end=today" & linefeed & ¬
-    "print(start.isoformat())" & linefeed & ¬
-    "print(end.isoformat())" & linefeed
-  set outText to do shell script "/usr/bin/python3 -c " & quoted form of py
-  set linesList to paragraphs of outText
-  if (count of linesList) < 2 then error "report range"
-  return {item 1 of linesList, item 2 of linesList}
-end getRangeYmdForPeriod
+-- All schedule semantics live in scripts/schedule_core.py, called through
+-- scripts/planner.py. Arguments are passed as shell-quoted argv values —
+-- never interpolated into code.
+on runPlanner(argsText)
+  return do shell script "export SHIFTLY_ROOT=" & quoted form of projectRoot & " && /usr/bin/python3 " & quoted form of (projectRoot & "/scripts/planner.py") & " " & argsText
+end runPlanner
 
 on getSyncRangeYmd()
-  set py to "import os,datetime" & linefeed & ¬
-    "import json,pathlib" & linefeed & ¬
-    "root=pathlib.Path(os.environ['SHIFTFLOW_ROOT'])" & linefeed & ¬
-    "swaps=json.loads((root/'data/swaps.json').read_text()) if (root/'data/swaps.json').exists() else []" & linefeed & ¬
-    "leave=json.loads((root/'data/leave.json').read_text()) if (root/'data/leave.json').exists() else []" & linefeed & ¬
-    "today=datetime.date.today()" & linefeed & ¬
-    "mode=(os.environ.get('SHIFTLY_SYNC_MODE') or os.environ.get('SHIFTY_SYNC_MODE') or os.environ.get('SHIFTFLOW_SYNC_MODE') or '')" & linefeed & ¬
-    "if mode=='next_month':" & linefeed & ¬
-    "  if today.month==12:" & linefeed & ¬
-    "    first=datetime.date(today.year+1,1,1)" & linefeed & ¬
-    "  else:" & linefeed & ¬
-    "    first=datetime.date(today.year,today.month+1,1)" & linefeed & ¬
-    "  if first.month==12:" & linefeed & ¬
-    "    last=datetime.date(first.year+1,1,1)-datetime.timedelta(days=1)" & linefeed & ¬
-    "  else:" & linefeed & ¬
-    "    last=datetime.date(first.year,first.month+1,1)-datetime.timedelta(days=1)" & linefeed & ¬
-    "else:" & linefeed & ¬
-    "  first=today" & linefeed & ¬
-    "  if today.month==12:" & linefeed & ¬
-    "    last=datetime.date(today.year+1,1,1)-datetime.timedelta(days=1)" & linefeed & ¬
-    "  else:" & linefeed & ¬
-    "    last=datetime.date(today.year,today.month+1,1)-datetime.timedelta(days=1)" & linefeed & ¬
-    "def date_or_none(s):" & linefeed & ¬
-    "  try: return datetime.date.fromisoformat(s)" & linefeed & ¬
-    "  except Exception: return None" & linefeed & ¬
-    "max_override=last" & linefeed & ¬
-    "for s in swaps:" & linefeed & ¬
-    "  t=date_or_none(s.get('to_date',''))" & linefeed & ¬
-    "  if t and t>max_override: max_override=t" & linefeed & ¬
-    "for lv in leave:" & linefeed & ¬
-    "  e=date_or_none(lv.get('end_date',''))" & linefeed & ¬
-    "  if e and e>max_override: max_override=e" & linefeed & ¬
-    "last=max_override" & linefeed & ¬
-    "print(first.isoformat())" & linefeed & ¬
-    "print(last.isoformat())" & linefeed
-  set outText to do shell script "export SHIFTLY_ROOT=" & quoted form of projectRoot & " && export SHIFTY_ROOT=" & quoted form of projectRoot & " && export SHIFTFLOW_ROOT=" & quoted form of projectRoot & " && /usr/bin/python3 -c " & quoted form of py
+  set outText to my runPlanner("sync-range")
   set linesList to paragraphs of outText
   if (count of linesList) is less than 2 then error "sync range"
   return {item 1 of linesList, item 2 of linesList}
 end getSyncRangeYmd
-
-on runPlannerPython(startYmd, endYmd)
-  set py to "import json,datetime,pathlib,os" & linefeed & ¬
-    "root=pathlib.Path(os.environ['SHIFTFLOW_ROOT'])" & linefeed & ¬
-    "cfg=json.loads((root/'data/config.json').read_text())" & linefeed & ¬
-    "swaps=json.loads((root/'data/swaps.json').read_text())" & linefeed & ¬
-    "leave=json.loads((root/'data/leave.json').read_text())" & linefeed & ¬
-    "start=datetime.date.fromisoformat('" & startYmd & "')" & linefeed & ¬
-    "end=datetime.date.fromisoformat('" & endYmd & "')" & linefeed & ¬
-    "wk={'MO':0,'TU':1,'WE':2,'TH':3,'FR':4,'SA':5,'SU':6}" & linefeed & ¬
-    "rules=sorted(cfg.get('rules',[]),key=lambda r:r.get('effective_from',''))" & linefeed & ¬
-    "def rule_for(d):" & linefeed & ¬
-    "  c=None" & linefeed & ¬
-    "  for r in rules:" & linefeed & ¬
-    "    ef=r.get('effective_from')" & linefeed & ¬
-    "    if not ef: continue" & linefeed & ¬
-    "    if datetime.date.fromisoformat(ef)<=d: c=r" & linefeed & ¬
-    "  return c" & linefeed & ¬
-    "shifts=set()" & linefeed & ¬
-    "d=start" & linefeed & ¬
-    "while d<=end:" & linefeed & ¬
-    "  r=rule_for(d)" & linefeed & ¬
-    "  if r:" & linefeed & ¬
-    "    wd={wk[x] for x in r.get('workdays',[]) if x in wk}" & linefeed & ¬
-    "    if d.weekday() in wd: shifts.add(d)" & linefeed & ¬
-    "  d+=datetime.timedelta(days=1)" & linefeed & ¬
-    "for s in swaps:" & linefeed & ¬
-    "  fd=s.get('from_date'); td=s.get('to_date')" & linefeed & ¬
-    "  if not fd or not td: continue" & linefeed & ¬
-    "  f=datetime.date.fromisoformat(fd); t=datetime.date.fromisoformat(td)" & linefeed & ¬
-    "  if f in shifts: shifts.remove(f)" & linefeed & ¬
-    "  if start<=t<=end: shifts.add(t)" & linefeed & ¬
-    "for lv in leave:" & linefeed & ¬
-    "  sd=lv.get('start_date'); ed=lv.get('end_date')" & linefeed & ¬
-    "  if not sd or not ed: continue" & linefeed & ¬
-    "  a=datetime.date.fromisoformat(sd); b=datetime.date.fromisoformat(ed)" & linefeed & ¬
-    "  if b<a: a,b=b,a" & linefeed & ¬
-    "  x=a" & linefeed & ¬
-    "  while x<=b:" & linefeed & ¬
-    "    if x in shifts: shifts.remove(x)" & linefeed & ¬
-    "    x+=datetime.timedelta(days=1)" & linefeed & ¬
-    "for d in sorted(shifts): print(d.isoformat()+'|auto')" & linefeed
-
-  return do shell script "export SHIFTLY_ROOT=" & quoted form of projectRoot & " && export SHIFTY_ROOT=" & quoted form of projectRoot & " && export SHIFTFLOW_ROOT=" & quoted form of projectRoot & " && /usr/bin/python3 -c " & quoted form of py
-end runPlannerPython
 
 on splitByPipe(t)
   set AppleScript's text item delimiters to "|"
@@ -302,8 +207,7 @@ on pad2(n)
 end pad2
 
 on readConfig()
-  set py to "import json,pathlib,os;root=pathlib.Path(os.environ['SHIFTFLOW_ROOT']);cfg=json.loads((root/'data/config.json').read_text());print(cfg.get('calendar_name','Shifts'));print(cfg.get('event_title','Work Schedule'));print(cfg.get('default_start_time','10:00'));print(cfg.get('default_end_time','18:30'))"
-  set outText to do shell script "export SHIFTLY_ROOT=" & quoted form of projectRoot & " && export SHIFTY_ROOT=" & quoted form of projectRoot & " && export SHIFTFLOW_ROOT=" & quoted form of projectRoot & " && /usr/bin/python3 -c " & quoted form of py
+  set outText to my runPlanner("config-summary")
   set linesList to paragraphs of outText
   if (count of linesList) < 4 then error "invalid config"
   return {calendar_name:item 1 of linesList, event_title:item 2 of linesList, default_start_time:item 3 of linesList, default_end_time:item 4 of linesList}

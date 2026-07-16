@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from schedule_core import (
     history_dates_in_range,
+    month_end,
     planned_dates,
     read_json,
     repo_root,
@@ -28,12 +29,6 @@ def shift_hours(start: str, end: str) -> float:
     if b < a:
         b += 24 * 60
     return (b - a) / 60.0
-
-
-def month_end(day: dt.date) -> dt.date:
-    if day.month == 12:
-        return dt.date(day.year + 1, 1, 1) - dt.timedelta(days=1)
-    return dt.date(day.year, day.month + 1, 1) - dt.timedelta(days=1)
 
 
 def resolve_range(period: str) -> tuple[dt.date, dt.date]:
