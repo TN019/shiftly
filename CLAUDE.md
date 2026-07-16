@@ -11,8 +11,10 @@
 - 仓库：`TN019/shiftly`（原 shifty，GitHub 已改名）。feature 分支开发，push + 建 PR 都允许，
   **但绝不执行 PR 合并**——合并永远留给用户。
 - commit：一句话，`feat:/fix:/chore:/refactor:/docs:/test:` 前缀（参考 git log 既有格式）；
-  author 设为 Claude（`--author="Claude Fable 5 <noreply@anthropic.com>"`）。
-- PR 描述：**背景 / 改动 / 验证** 三段；Claude 为 co-author。
+  author/committer 用默认 git 身份（用户本人），消息末尾加
+  `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>` trailer。
+- PR 描述：**背景 / 改动 / 验证** 三段；PR 归 Claude（保留 Generated with Claude Code 页脚），
+  不写用户为 co-author。
 - 代码质量：自测后再交；无法自测的（如真实日历交互）在 PR 里写清让用户测什么、怎么测、预期效果。
 - 拿不准的事先问用户，不要擅自决定。
 
