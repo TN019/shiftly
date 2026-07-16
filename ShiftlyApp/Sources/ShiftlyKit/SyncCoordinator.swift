@@ -45,14 +45,27 @@ public final class SyncCoordinator {
         self.applier = ReadbackApplier(store: store)
     }
 
-    /// Runs the sync; writes meta.json with success or error before returning.
+    /// Runs the sync; writes meta.json, last_sync_report.json and the
+    /// readback journal with success or error before returning.
     public func sync() throws -> SyncOutcome {
+        let stamp = Self.timestamp()
         do {
             let outcome = try run()
             try? writeMeta(status: "success", error: nil)
+            try? ReadbackJournal(paths: store.paths).append(outcome.readbacks, at: stamp)
+            try? store.saveSyncReport(SyncReportFile(
+                at: stamp, status: "success",
+                created: outcome.created, updated: outcome.updated, deleted: outcome.deleted,
+                readback_count: outcome.readbacks.count,
+                ignored_foreign: outcome.ignoredForeignTitles,
+                converged: outcome.converged
+            ))
             return outcome
         } catch {
             try? writeMeta(status: "error", error: String(describing: error))
+            try? store.saveSyncReport(SyncReportFile(
+                at: stamp, status: "error", error: String(describing: error)
+            ))
             throw error
         }
     }

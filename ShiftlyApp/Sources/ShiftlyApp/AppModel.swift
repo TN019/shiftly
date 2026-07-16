@@ -23,6 +23,8 @@ final class AppModel: ObservableObject {
     @Published var workHistory: [WorkHistoryRow] = []
     @Published var workHistoryNote = ""
     @Published var rulesSummary = ""
+    @Published var lastReport: SyncReportFile?
+    @Published var readbackLog: [ReadbackRecord] = []
 
     let paths = ShiftlyPaths.shared
     private let store = DataStore()
@@ -41,7 +43,33 @@ final class AppModel: ObservableObject {
         swaps = (try? store.loadSwaps()) ?? []
         leaves = (try? store.loadLeaves()) ?? []
         loadMeta()
+        loadSyncReport()
         refreshWorkHistory()
+    }
+
+    func loadSyncReport() {
+        lastReport = store.loadSyncReport()
+        readbackLog = ReadbackJournal(paths: paths).load().reversed()
+    }
+
+    func undoReadback(_ record: ReadbackRecord) {
+        guard !isBusy else { return }
+        do {
+            let undoService = ReadbackUndoService(
+                store: store,
+                journal: ReadbackJournal(paths: paths)
+            )
+            if try undoService.undo(record) {
+                loadSyncReport()
+                // Re-sync writes the restored plan back to the calendar.
+                syncNow()
+            } else {
+                statusMessage = "Could not undo: matching record no longer exists."
+                loadSyncReport()
+            }
+        } catch {
+            statusMessage = "Undo failed: \(error.localizedDescription)"
+        }
     }
 
     func saveSchedule() {

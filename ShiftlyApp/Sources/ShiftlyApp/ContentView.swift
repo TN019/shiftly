@@ -72,6 +72,7 @@ struct ContentView: View {
                     header
                     weeklySection
                     overridesSection
+                    syncReportSection
                     historySection
                     actions
                     if !model.statusMessage.isEmpty {
