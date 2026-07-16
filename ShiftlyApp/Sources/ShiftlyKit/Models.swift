@@ -35,6 +35,11 @@ public struct SwapItem: Codable, Identifiable, Equatable {
         self.from_date = from_date
         self.to_date = to_date
     }
+
+    // id is in-memory identity only; equality is about content.
+    public static func == (lhs: SwapItem, rhs: SwapItem) -> Bool {
+        lhs.from_date == rhs.from_date && lhs.to_date == rhs.to_date
+    }
 }
 
 public struct LeaveItem: Codable, Identifiable, Equatable {
@@ -50,11 +55,22 @@ public struct LeaveItem: Codable, Identifiable, Equatable {
         self.start_date = start_date
         self.end_date = end_date
     }
+
+    public static func == (lhs: LeaveItem, rhs: LeaveItem) -> Bool {
+        lhs.start_date == rhs.start_date && lhs.end_date == rhs.end_date
+    }
 }
 
 public struct Meta: Codable {
     public var last_sync_at: String
     public var last_sync_status: String
+    public var last_sync_error: String?
+
+    public init(last_sync_at: String, last_sync_status: String, last_sync_error: String? = nil) {
+        self.last_sync_at = last_sync_at
+        self.last_sync_status = last_sync_status
+        self.last_sync_error = last_sync_error
+    }
 }
 
 public struct WorkHistoryRow: Codable, Identifiable {

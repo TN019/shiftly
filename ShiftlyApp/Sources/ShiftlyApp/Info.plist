@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key>
+  <string>com.shiftly.app</string>
+  <key>CFBundleName</key>
+  <string>Shiftly</string>
+  <key>NSCalendarsFullAccessUsageDescription</key>
+  <string>Shiftly keeps your Shifts calendar in sync with your work schedule: it creates shift events and reads back changes you make in Calendar.</string>
+  <key>NSCalendarsUsageDescription</key>
+  <string>Shiftly keeps your Shifts calendar in sync with your work schedule.</string>
+</dict>
+</plist>

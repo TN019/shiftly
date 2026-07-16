@@ -72,13 +72,23 @@ struct ContentView: View {
                     header
                     weeklySection
                     overridesSection
+                    syncReportSection
                     historySection
                     actions
                     if !model.statusMessage.isEmpty {
-                        Text(model.statusMessage)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 2)
+                        HStack(spacing: 10) {
+                            Text(model.statusMessage)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            if model.showSettingsHint {
+                                Button("Open Settings") {
+                                    model.openCalendarPrivacySettings()
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
+                        }
+                        .padding(.top, 2)
                     }
                     Color.clear
                         .frame(minHeight: 120)
