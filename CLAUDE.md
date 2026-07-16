@@ -60,7 +60,8 @@ launchd/com.shiftly.sync.plist           定时同步模板
 ## 常用命令
 
 ```bash
-cd ShiftlyApp && swift run               # 跑 GUI
+cd ShiftlyApp && swift run               # 跑 GUI（开发）
+scripts/build_app.sh                     # 打包 dist/Shiftly.app（双击启动）
 scripts/test.sh                          # 全部测试（--fast 跳过 swift）
 osascript scripts/sync.applescript       # 手动同步（旧链路）
 ```

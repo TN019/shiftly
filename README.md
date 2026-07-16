@@ -52,9 +52,25 @@ Subprocesses spawned by the app and AppleScript set `SHIFTLY_ROOT` **and** the l
 
 `config.json` includes **`config_version`** (currently `1`). Older files without it are treated as version 1; the Swift app may write `config_version` when you save the schedule.
 
-## Swift app (recommended)
+## Shiftly.app (recommended, no terminal)
 
-Single window: sync status, weekly schedule + effective date, swap/leave overrides (collapsible list), **Work history**, **Sync Now**, and **Open Calendar**.
+Build a double-clickable app bundle (ad-hoc signed, local use):
+
+```bash
+scripts/build_app.sh          # → dist/Shiftly.app
+```
+
+Move `dist/Shiftly.app` to `/Applications` (or anywhere) and double-click.
+
+**First run:** the app asks for a **data folder** (a starter `data/config.json` is created if the folder is empty; an existing Shiftly data folder is picked up as is). Set the weekly schedule, press **Sync Now** — macOS asks for Calendar access on the first sync. The chosen folder is remembered; the `SHIFTLY_ROOT` environment variable still wins when set.
+
+The Python helper scripts are bundled into the app, so no repo checkout is needed at the data folder (a `scripts/` directory at the data root takes precedence when present).
+
+**Scheduled sync:** the in-app **Auto-sync** setting (hourly / 6h / 12h / daily) syncs while the app is open; enable **Launch at login** so it resumes after a reboot. For syncing without the app running, use the [launchd template](#scheduled-sync-launchagent) instead — the two approaches are independent.
+
+## Swift app from a checkout (development)
+
+Single window: sync status, weekly schedule + effective date, swap/leave overrides (collapsible list), sync report with undo, **Work history**, **Sync Now**, and **Open Calendar**.
 
 ```bash
 cd ShiftlyApp
@@ -62,8 +78,6 @@ swift run
 ```
 
 The built executable is **`ShiftlyApp`**.
-
-To produce an app bundle, open the package in Xcode and archive, or add an app target as you prefer.
 
 ## AppleScript menu
 

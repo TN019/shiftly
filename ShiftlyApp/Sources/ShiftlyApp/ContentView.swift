@@ -70,11 +70,15 @@ struct ContentView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     header
-                    weeklySection
-                    overridesSection
-                    syncReportSection
-                    historySection
-                    actions
+                    if model.needsRootSetup {
+                        firstRunSection
+                    } else {
+                        weeklySection
+                        overridesSection
+                        syncReportSection
+                        historySection
+                        actions
+                    }
                     if !model.statusMessage.isEmpty {
                         HStack(spacing: 10) {
                             Text(model.statusMessage)
@@ -109,6 +113,7 @@ struct ContentView: View {
             }
             .onAppear {
                 model.load()
+                model.startAutoSyncIfEnabled()
                 DispatchQueue.main.async {
                     resignAllFocus()
                 }
@@ -263,6 +268,57 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
                     .disabled(model.isBusy)
             }
+            HStack(spacing: 14) {
+                Text("Auto-sync").font(.caption).foregroundStyle(.secondary)
+                Picker("", selection: $model.autoSyncHours) {
+                    Text("Off").tag(0)
+                    Text("Hourly").tag(1)
+                    Text("Every 6h").tag(6)
+                    Text("Every 12h").tag(12)
+                    Text("Daily").tag(24)
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 110)
+                Toggle("Launch at login", isOn: Binding(
+                    get: { model.launchAtLogin },
+                    set: { model.setLaunchAtLogin($0) }
+                ))
+                .font(.caption)
+                .toggleStyle(.checkbox)
+                Spacer(minLength: 0)
+                Text("Auto-sync runs while Shiftly is open.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private var firstRunSection: some View {
+        card("Welcome to Shiftly") {
+            Text("Choose a folder to hold Shiftly's data (schedule, swaps, leave). A starter config is created if the folder is empty — an existing Shiftly data folder is picked up as is.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("After that: set your weekly schedule, then press Sync Now — macOS will ask for Calendar access on the first sync.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            Button("Choose Data Folder…") {
+                chooseDataFolder()
+            }
+            .buttonStyle(.borderedProminent)
+        }
+    }
+
+    private func chooseDataFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.prompt = "Use This Folder"
+        panel.message = "Choose the folder where Shiftly stores its data."
+        if panel.runModal() == .OK, let url = panel.url {
+            model.adoptRoot(url)
         }
     }
 

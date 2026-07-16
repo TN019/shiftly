@@ -16,6 +16,23 @@ public struct PlannerScriptError: Error, CustomStringConvertible {
     public let description: String
 }
 
+/// Finds helper scripts: a scripts/ directory at the data root wins (repo
+/// checkouts), otherwise the copy bundled into the .app Resources is used.
+public enum ScriptLocator {
+    public static func locate(_ name: String, root: String) -> String? {
+        let atRoot = "\(root)/scripts/\(name)"
+        if FileManager.default.fileExists(atPath: atRoot) {
+            return atRoot
+        }
+        if let bundled = Bundle.main.resourceURL?
+            .appendingPathComponent("scripts/\(name)").path,
+            FileManager.default.fileExists(atPath: bundled) {
+            return bundled
+        }
+        return nil
+    }
+}
+
 /// Runs scripts/planner.py. Blocking — call off the main thread.
 public struct PlannerScriptProvider: ScheduleProvider {
     public let root: String
@@ -41,9 +58,12 @@ public struct PlannerScriptProvider: ScheduleProvider {
     }
 
     private func run(_ args: [String]) throws -> String {
+        guard let script = ScriptLocator.locate("planner.py", root: root) else {
+            throw PlannerScriptError(description: "planner.py not found at the data root or in the app bundle")
+        }
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
-        proc.arguments = ["\(root)/scripts/planner.py"] + args
+        proc.arguments = [script] + args
         var env = ProcessInfo.processInfo.environment
         ShiftlyPaths.applyRepoRootEnvironment(&env, root: root)
         proc.environment = env

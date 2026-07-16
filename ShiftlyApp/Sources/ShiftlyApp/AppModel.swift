@@ -1,6 +1,7 @@
 import AppKit
 import EventKit
 import Foundation
+import ServiceManagement
 import ShiftlyKit
 
 @MainActor
@@ -26,8 +27,26 @@ final class AppModel: ObservableObject {
     @Published var lastReport: SyncReportFile?
     @Published var readbackLog: [ReadbackRecord] = []
 
-    let paths = ShiftlyPaths.shared
-    private let store = DataStore()
+    @Published private(set) var paths = ShiftlyPaths.shared
+    private var store: DataStore { DataStore(paths: paths) }
+
+    /// True when no data root could be resolved: the first-run view is shown.
+    var needsRootSetup: Bool { !paths.isValid }
+
+    /// First-run flow: adopt a user-chosen folder as the data root,
+    /// creating starter data files when missing.
+    func adoptRoot(_ url: URL) {
+        do {
+            let root = url.path
+            try ShiftlyPaths.bootstrapDataDirectory(atRoot: root)
+            ShiftlyPaths.persistRoot(root)
+            paths = ShiftlyPaths(root: root)
+            statusMessage = "Data folder ready. Set your weekly schedule, then Sync Now."
+            load()
+        } catch {
+            statusMessage = "Could not prepare data folder: \(error.localizedDescription)"
+        }
+    }
 
     let dayOrder = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
     let dayLabels: [String: String] = [
@@ -167,15 +186,16 @@ final class AppModel: ObservableObject {
                 return
             }
             do {
+                let syncPaths = paths
                 let outcome = try await Task.detached(priority: .userInitiated) {
-                    let store = DataStore()
+                    let store = DataStore(paths: syncPaths)
                     let config = try store.loadConfig()
                     let calendar = try EKCalendarStore.locateOrCreateCalendar(
                         named: config.calendar_name, in: ekStore
                     )
                     let coordinator = SyncCoordinator(
                         store: store,
-                        stateStore: SyncStateStore(),
+                        stateStore: SyncStateStore(paths: syncPaths),
                         calendar: EKCalendarStore(eventStore: ekStore, calendar: calendar),
                         provider: PlannerScriptProvider(root: root)
                     )
@@ -237,7 +257,11 @@ final class AppModel: ObservableObject {
             return
         }
         let root = paths.root
-        let script = paths.workHistoryScript
+        guard let script = ScriptLocator.locate("work_history.py", root: root) else {
+            workHistory = []
+            workHistoryNote = "work_history.py not found at the data root or in the app bundle."
+            return
+        }
         Task { @MainActor in
             let result = await Task.detached(priority: .utility) {
                 WorkHistoryScriptRunner.run(root: root, scriptPath: script)
@@ -286,5 +310,64 @@ final class AppModel: ObservableObject {
             return "1 rule · effective from \(latest.effective_from)"
         }
         return "\(sorted.count) rules · latest effective from \(latest.effective_from)"
+    }
+
+    // MARK: Auto-sync (runs while the app is open; pair with launch-at-login
+    // so a reboot needs no terminal. Headless syncing without the app stays
+    // on the launchd template.)
+
+    static let autoSyncDefaultsKey = "shiftly.autoSyncHours"
+    static let autoSyncChoices = [0, 1, 6, 12, 24]
+
+    @Published var autoSyncHours: Int = UserDefaults.standard.integer(forKey: AppModel.autoSyncDefaultsKey) {
+        didSet {
+            UserDefaults.standard.set(autoSyncHours, forKey: Self.autoSyncDefaultsKey)
+            scheduleAutoSync()
+        }
+    }
+    private var autoSyncTimer: Timer?
+
+    /// Called once at startup: schedules the timer and, when enabled,
+    /// runs a catch-up sync right away.
+    func startAutoSyncIfEnabled() {
+        scheduleAutoSync()
+        if autoSyncHours > 0 && paths.isValid {
+            syncNow()
+        }
+    }
+
+    private func scheduleAutoSync() {
+        autoSyncTimer?.invalidate()
+        autoSyncTimer = nil
+        guard autoSyncHours > 0 else { return }
+        let interval = TimeInterval(autoSyncHours) * 3600
+        let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, !self.isBusy, self.paths.isValid else { return }
+                self.syncNow()
+            }
+        }
+        timer.tolerance = 300
+        RunLoop.main.add(timer, forMode: .common)
+        autoSyncTimer = timer
+    }
+
+    // MARK: Launch at login (SMAppService; only effective for the bundled
+    // Shiftly.app, not `swift run`)
+
+    @Published var launchAtLogin = SMAppService.mainApp.status == .enabled
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+            launchAtLogin = SMAppService.mainApp.status == .enabled
+        } catch {
+            launchAtLogin = SMAppService.mainApp.status == .enabled
+            statusMessage = "Launch at login unavailable: \(error.localizedDescription) (requires the bundled Shiftly.app)"
+        }
     }
 }

@@ -23,9 +23,17 @@ public struct ShiftlyPaths {
     public var metaPath: String { "\(root)/data/meta.json" }
     public var workHistoryScript: String { "\(root)/scripts/work_history.py" }
 
+    /// UserDefaults key holding the root chosen in the first-run flow.
+    /// Environment variables still win, so dev setups stay unaffected.
+    public static let rootDefaultsKey = "shiftly.root"
+
     private static func resolveRoot() -> String {
         if let e = Self.rootFromEnvironment() {
             return e
+        }
+        if let saved = UserDefaults.standard.string(forKey: rootDefaultsKey),
+           FileManager.default.fileExists(atPath: "\(saved)/data/config.json") {
+            return saved
         }
         if let r = findRepoRoot(from: executableDirectory()) {
             return r
@@ -34,6 +42,37 @@ public struct ShiftlyPaths {
             return r
         }
         return ""
+    }
+
+    /// Remember a root chosen in the UI for future launches.
+    public static func persistRoot(_ root: String) {
+        UserDefaults.standard.set(root, forKey: rootDefaultsKey)
+    }
+
+    /// Create the minimal data files a fresh root needs (no-op for files
+    /// that already exist). Returns true when a new config.json was written.
+    @discardableResult
+    public static func bootstrapDataDirectory(atRoot root: String) throws -> Bool {
+        let fm = FileManager.default
+        try fm.createDirectory(atPath: "\(root)/data", withIntermediateDirectories: true)
+        for name in ["swaps.json", "leave.json"] {
+            let path = "\(root)/data/\(name)"
+            if !fm.fileExists(atPath: path) {
+                try Data("[]\n".utf8).write(to: URL(fileURLWithPath: path))
+            }
+        }
+        let configPath = "\(root)/data/config.json"
+        guard !fm.fileExists(atPath: configPath) else { return false }
+        try ConfigLogic.writeRawConfig([
+            "config_version": 1,
+            "calendar_name": "Shifts",
+            "event_title": "Work Schedule",
+            "default_start_time": "10:00",
+            "default_end_time": "18:30",
+            "setup_completed": false,
+            "rules": [],
+        ], toPath: configPath)
+        return true
     }
 
     private static func rootFromEnvironment() -> String? {
