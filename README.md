@@ -1,187 +1,106 @@
+<div align="center">
+
+<img src="assets/icon.png" width="128" alt="Shiftly icon" />
+
 # Shiftly
 
-> Formerly **Shifty**. See [Migrating from Shifty](#migrating-from-shifty) if you had an older install.
+**Your shifts, your pay, your work journal — living right inside Apple Calendar.**
 
-Shiftly keeps a dedicated **Shifts** calendar in Apple Calendar in sync with your work schedule: repeating rules, one-off swaps, leave ranges, and optional import from a CSV history file. Everything runs locally on macOS.
+[![macOS](https://img.shields.io/badge/macOS-13%2B-blue)](docs/SETUP.md)
+[![Swift](https://img.shields.io/badge/Swift-5.9-orange)](docs/SETUP.md)
+[![License](https://img.shields.io/badge/license-PolyForm%20NC-lightgrey)](LICENSE)
+[![Release](https://img.shields.io/badge/release-v0.7.0-brightgreen)](https://github.com/TN019/shiftly/releases)
 
-You can drive it from the **SwiftUI app** (single window) or from the **AppleScript menu**; both read and write the same files under `data/`.
+[English](README.md) · [简体中文](README.zh-Hans.md)
 
-Roadmap (schedule + pay visualization + Markdown work log, bidirectional calendar sync): see [docs/PLAN.md](docs/PLAN.md).
+</div>
 
-## Requirements
+---
 
-- macOS 13 or later (Swift app target)
-- Calendar access (EventKit): macOS prompts on the first sync from the app
-- Python 3 (for helper scripts invoked by the app and AppleScript)
+Shiftly is a native macOS app for anyone who works shifts. Set your weekly
+pattern once — Shiftly writes it into a dedicated Apple Calendar, keeps it in
+sync **both ways**, works out your pay, and gives every workday a Markdown
+journal page. All of it on your Mac, in plain files you own.
 
-## Project root (`SHIFTLY_ROOT`)
+## ✨ What it does
 
-All tools need a single **repository root** (the folder that contains `data/` and `scripts/`).
+### 📅 Calendar sync that goes both ways
 
-| How you run | How the root is found |
-|-------------|------------------------|
-| **Environment** | Prefer **`SHIFTLY_ROOT`**. Legacy **`SHIFTY_ROOT`** and **`SHIFTFLOW_ROOT`** are still accepted. |
-| **AppleScript** | `osascript /path/to/scripts/main.applescript`: parent of `scripts/` is used (`path to me` → `dirname` twice). |
-| **Python** | `scripts/*.py` use `SHIFTLY_ROOT` / legacy names, else `Path(__file__).resolve().parent.parent`. |
-| **Swift app** | `SHIFTLY_ROOT` or legacy names, else walk upward from the executable (e.g. `swift run` → `.build/...`) or from the source file until `data/config.json` or `data/config.example.json` exists. |
+Your schedule lands in Apple Calendar — and Apple Calendar talks back.
+**Drag a shift to another day** and Shiftly records it as a swap. **Delete
+one** and it becomes a day off. **Create one** and it counts as an extra
+shift. Every change is listed in a sync report, and any of them can be
+undone with one click.
 
-Subprocesses spawned by the app and AppleScript set `SHIFTLY_ROOT` **and** the legacy names to the same path so embedded scripts keep working.
+### 🗓 See your month at a glance
 
-**LaunchAgent:** see `launchd/com.shiftly.sync.plist`. Replace every **`/CHANGE_ME/Shiftly`** with your install path.
+A month view shows regular shifts, swapped days, one-off shifts and leave in
+different colors. Click any day to swap it, take leave, or open that day's
+journal. Rules keep their history — change your pattern from next month, and
+past records stay exactly as they were.
 
-## First-time setup
+### 💰 Know what you've earned
 
-1. Create `data/config.json` (the whole `data/` directory is gitignored):
+Set your hourly rate (raises keep their effective dates) and Shiftly turns
+worked shifts into money: a monthly chart of the last 12 months, year-to-date
+totals, per-shift breakdowns, and payslip export to CSV or Markdown. Flip the
+display between **AUD / CNY / USD** with your own exchange rates — nothing is
+ever fetched from the internet.
 
-   ```json
-   {
-     "config_version": 1,
-     "calendar_name": "Shifts",
-     "event_title": "Work Schedule",
-     "default_start_time": "10:00",
-     "default_end_time": "18:30",
-     "history_csv": "History.csv",
-     "setup_completed": false,
-     "rules": []
-   }
-   ```
+### 📝 A journal page for every workday
 
-2. Keep `setup_completed` as `false` if you want the AppleScript setup wizard on first `main.applescript` run.
+One Markdown file per day, stored in a folder *you* choose, openable in any
+editor. Jot a quick timestamped note from the app, search everything later,
+and jump to any day's page straight from the calendar.
 
-3. Optionally place **`History.csv`** at the repository root (or set `history_csv` in config). The sync script imports it once and leaves a marker at `data/meta.history_imported`.
+### 🔔 Lives in your menu bar
 
-`config.json` includes **`config_version`** (currently `1`). Older files without it are treated as version 1; the Swift app may write `config_version` when you save the schedule.
+Next shift and countdown at a glance, one-click sync, pre-shift reminders
+(configurable lead time), auto-sync on a schedule, launch at login. Close the
+window — Shiftly keeps working.
 
-## Shiftly.app (recommended, no terminal)
+### 🤖 Built for the AI era
 
-Build a double-clickable app bundle (ad-hoc signed, local use):
+Everything Shiftly knows lives in human-readable JSON and Markdown, with a
+[documented contract](docs/DATA_AND_API.md). A bundled CLI speaks JSON, and an
+[MCP server](packages/mcp-server/) lets AI assistants like Claude manage your
+schedule in natural language: *"move Wednesday's shift to Friday and sync the
+calendar."*
 
-```bash
-scripts/build_app.sh          # → dist/Shiftly.app
-```
+### 🔒 Local-first, private by design
 
-Move `dist/Shiftly.app` to `/Applications` (or anywhere) and double-click.
+No account. No server. No analytics. Your schedule, pay and journals are
+plain files in a folder you picked — back them up, sync them, grep them,
+take them anywhere.
 
-**First run:** the app asks for a **data folder** (a starter `data/config.json` is created if the folder is empty; an existing Shiftly data folder is picked up as is). Set the weekly schedule, press **Sync Now** — macOS asks for Calendar access on the first sync. The chosen folder is remembered; the `SHIFTLY_ROOT` environment variable still wins when set.
-
-The Python helper scripts are bundled into the app, so no repo checkout is needed at the data folder (a `scripts/` directory at the data root takes precedence when present).
-
-**Scheduled sync:** the in-app **Auto-sync** setting (hourly / 6h / 12h / daily) syncs while the app is open; enable **Launch at login** so it resumes after a reboot. For syncing without the app running, use the [launchd template](#scheduled-sync-launchagent) instead — the two approaches are independent.
-
-## Swift app from a checkout (development)
-
-Single window: sync status, weekly schedule + effective date, swap/leave overrides (collapsible list), sync report with undo, **Work history**, **Sync Now**, and **Open Calendar**.
-
-```bash
-cd ShiftlyApp
-swift run
-```
-
-The built executable is **`ShiftlyApp`**.
-
-## AppleScript menu
-
-Looping menu until **Exit**:
+## 🚀 Get started
 
 ```bash
-osascript scripts/main.applescript
+git clone https://github.com/TN019/shiftly.git && cd shiftly
+scripts/build_app.sh && cp -R dist/Shiftly.app /Applications/
 ```
 
-Sections: **Schedule** (rules and hours), **Overrides** (swap/leave), **Sync**, **Reports** (calls `report.py`).
+Then it's three steps:
 
-The menu's **Sync Now** runs the app binary headlessly (`Shiftly --sync`, same EventKit engine as the GUI); it looks for `dist/Shiftly.app`, `/Applications/Shiftly.app`, then a local `swift build` product. Direct sync without the menu:
+1. **Open Shiftly** and pick a folder for your data (any empty folder works)
+2. **Set your weekly pattern** — which days, what hours
+3. **Press Sync Now** and allow calendar access
 
-```bash
-/Applications/Shiftly.app/Contents/MacOS/Shiftly --sync
-```
+Your shifts are in Apple Calendar. From here on, editing either side keeps
+both in sync.
 
-## How sync chooses a date range
+## 📚 Learn more
 
-| Trigger | Window |
-|--------|--------|
-| Manual (app / menu / `--sync`) | From **today** through the **last day of the current month** |
-| With overrides | Extends to cover the latest `to_date` (swaps) or `end_date` (leave) in JSON |
-| LaunchAgent with `SHIFTLY_SYNC_MODE=next_month` (legacy `SHIFTY_SYNC_MODE` / `SHIFTFLOW_SYNC_MODE`) | **Next full calendar month** |
-
-Sync is bidirectional and incremental: only events recorded in `data/sync_state.json` are touched, and edits made in Calendar are read back into the data files (see [docs/SYNC_DESIGN.md](docs/SYNC_DESIGN.md)). Events from the old AppleScript engine (tagged `[SF_SYNC]` in notes) are claimed on first sync.
-
-## Work history (logic)
-
-`scripts/work_history.py` prints JSON: each past day (on or before today) that appears in either the **planned** schedule (rules + swaps + leave) or **History.csv** (`Name` column as `YYYY-MM-DD`). **`ordinal`** is 1-based in chronological order. The Swift UI shows **Day N**, **ISO date**, and a localized weekday.
-
-## Data files
-
-| Path | Role |
-|------|------|
-| `data/config.json` | `config_version`, calendar name, title, times, `rules`, `setup_completed`, optional `history_csv` |
-| `data/swaps.json` | Date swaps applied when generating shifts |
-| `data/leave.json` | Leave ranges |
-| `data/meta.json` | Last sync time/status/error (written by sync) |
-| `data/overrides.json` | Per-day time overrides read back from Calendar |
-| `data/manual_shifts.json` | Shifts created directly in Calendar |
-| `data/sync_state.json` | Event mapping (engine-private) |
-| `data/last_sync_report.json` | Last sync summary (engine-private) |
-| `data/readback_log.json` | Readback journal with undo flags (engine-private) |
-
-Schemas: [docs/DATA_AND_API.md](docs/DATA_AND_API.md).
-
-## Scripts
-
-| Script | Purpose |
-|--------|---------|
-| `scripts/main.applescript` | Grouped GUI menu (backup entry point) |
-| `scripts/planner.py` | CLI over the scheduling core (used by the app and the menu) |
-| `scripts/schedule_core.py` | Shared planning + work-history logic for Python |
-| `scripts/work_history.py` | JSON list of past work days (used by the Swift app) |
-| `scripts/report.py` | Weekly/monthly hours summary |
-| `scripts/apply_setup.py` | Setup helper: merge stdin JSON into `config.json` |
-| `scripts/needs_setup.py` | Exit code indicates whether setup wizard should run |
-| `scripts/build_app.sh` | Build `dist/Shiftly.app` |
-| `scripts/test.sh` | Run the whole test suite |
-
-## Tests
-
-```bash
-scripts/test.sh          # python + applescript syntax + swift build & test
-```
-
-## Scheduled sync (LaunchAgent)
-
-The LaunchAgent runs `Shiftly --sync` headlessly — the same EventKit engine as the app. Grant Calendar access once by syncing from the app before loading the job.
-
-1. Install `Shiftly.app` to `/Applications` (`scripts/build_app.sh`) and sync once from the UI.
-2. Copy `launchd/com.shiftly.sync.plist` to `~/Library/LaunchAgents/`.
-3. Replace **`/CHANGE_ME/ShiftlyData`** with your data folder (the one that contains `data/`).
-4. Load:
-
-   ```bash
-   launchctl load ~/Library/LaunchAgents/com.shiftly.sync.plist
-   ```
-
-Default schedule: **day 28 at 00:00**, `SHIFTLY_SYNC_MODE=next_month`, `RunAtLoad` false.
-
-## Migrating from Shifty
-
-Your data and synced calendar events are untouched by the rename; only names change.
-
-1. **Environment variable:** switch to `SHIFTLY_ROOT`. Old `SHIFTY_ROOT` / `SHIFTFLOW_ROOT` still work.
-2. **LaunchAgent:** unload any old job and install the new one:
-
-   ```bash
-   launchctl unload ~/Library/LaunchAgents/com.shifty.sync.plist 2>/dev/null
-   launchctl unload ~/Library/LaunchAgents/com.shiftflow.sync.plist 2>/dev/null
-   rm -f ~/Library/LaunchAgents/com.shifty.sync.plist ~/Library/LaunchAgents/com.shiftflow.sync.plist
-   ```
-
-   Then follow [Scheduled sync](#scheduled-sync-launchagent) with `com.shiftly.sync.plist` (it now runs `Shiftly --sync` instead of the removed `sync.applescript`).
-3. **Built executable:** now `ShiftlyApp` (was `ShiftyApp`); the Swift package folder is `ShiftlyApp/`.
-4. **Git remote:** the GitHub repository is now `TN019/shiftly` (GitHub redirects the old URL).
-5. **History.csv:** still feeds the work-history list, but is no longer imported into the calendar as events (that one-time import was part of the removed AppleScript engine). Previously imported events are left alone — they sit in the past, outside the sync window.
+| | |
+|---|---|
+| [Setup & technical reference](docs/SETUP.md) | Install details, scheduled sync, migration |
+| [Data & interface reference](docs/DATA_AND_API.md) | File schemas, CLI, MCP — the contract for scripts & AI |
+| [Sync design](docs/SYNC_DESIGN.md) | How two-way sync works under the hood |
+| [Project history](docs/PLAN.md) | The v2 roadmap that built all of this |
 
 ## License
 
 [PolyForm Noncommercial 1.0.0](LICENSE) — free for personal and other
-noncommercial use (hobby, research, education, nonprofit); commercial use
-requires a separate license from the author.
+noncommercial use; commercial use requires a separate license from the author.
 
 > Required Notice: Copyright (c) 2026 Blake Liu (https://github.com/TN019/shiftly)
