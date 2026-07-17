@@ -75,6 +75,43 @@ public struct WorkLogStore {
             .write(to: URL(fileURLWithPath: filePath), options: .atomic)
     }
 
+    /// One search match: the day plus the first matching line as a snippet.
+    public struct SearchHit: Equatable, Identifiable {
+        public var id: String { date }
+        public let date: String
+        public let snippet: String
+    }
+
+    /// Case-insensitive full-text search over frontmatter and body,
+    /// optionally bounded to [from, to] (YYYY-MM-DD). A plain directory
+    /// scan: thousands of small Markdown files stay well under a second.
+    public func search(query: String, from: String? = nil, to: String? = nil) -> [SearchHit] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return [] }
+        let fm = FileManager.default
+        guard let years = try? fm.contentsOfDirectory(atPath: rootDir) else { return [] }
+
+        var hits: [SearchHit] = []
+        for year in years.sorted() where year.count == 4 && Int(year) != nil {
+            guard let names = try? fm.contentsOfDirectory(atPath: "\(rootDir)/\(year)") else { continue }
+            for name in names.sorted() where name.hasSuffix(".md") {
+                let date = String(name.dropLast(3))
+                if let from, date < from { continue }
+                if let to, date > to { continue }
+                guard let content = read(date: date),
+                      content.localizedCaseInsensitiveContains(needle) else { continue }
+                let line = content
+                    .components(separatedBy: "\n")
+                    .first { $0.localizedCaseInsensitiveContains(needle) } ?? ""
+                hits.append(SearchHit(
+                    date: date,
+                    snippet: String(line.trimmingCharacters(in: .whitespaces).prefix(120))
+                ))
+            }
+        }
+        return hits.sorted { $0.date > $1.date }
+    }
+
     /// Days (YYYY-MM-DD) with a log file in a month ("YYYY-MM").
     public func datesWithLogs(inMonth month: String) -> Set<String> {
         let year = String(month.prefix(4))
