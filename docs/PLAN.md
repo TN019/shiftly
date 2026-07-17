@@ -1,8 +1,9 @@
 # Shiftly 总体方案（v2 规划）
 
-> 状态：规划已确认，尚未开始实施。任务卡在 mingri 的 **Shiftly** 项目
-> （project_id `16cfcb5f-28c4-4658-a4d8-78299fb5ae24`，https://mingri.vercel.app）。
-> 本文是所有后续会话的起点文档。
+> 状态：**已全部完成**（2026-07-17，v0.7.0，31/31 张卡，PR #1–#28）。
+> 本文保留为架构决策与路线图的历史记录；当前数据/接口契约见
+> [DATA_AND_API.md](DATA_AND_API.md)，同步设计见 [SYNC_DESIGN.md](SYNC_DESIGN.md)。
+> 任务卡在 mingri 的 **Shiftly** 项目（project_id `16cfcb5f-28c4-4658-a4d8-78299fb5ae24`）。
 
 ## 愿景
 

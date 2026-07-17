@@ -2,9 +2,10 @@
 
 ## 这是什么
 
-**Shiftly**（旧名 Shifty，已更名）：本地优先的 macOS 排班工具，正在扩展为
-**排班 + 工资计算可视化 + Markdown 工作日志** 三合一应用，与 Apple Calendar 双向同步。
-不做网站部署；日常使用零终端（双击 .app）。
+**Shiftly**（旧名 Shifty）：本地优先的 macOS **排班 + 工资 + Markdown 工作日志**
+三合一应用，与 Apple Calendar 双向同步（EventKit，回读+撤销）。
+不做网站部署；日常使用零终端（双击 .app，登录自启 + 自动同步）。
+**v2 规划（M1–M6，31 张卡）已于 2026-07-17 全部完成，当前版本 v0.7.0。**
 
 ## Git / PR 约定
 
@@ -38,22 +39,25 @@
   `https://mingri.vercel.app/api/v1`，Bearer key 见 `~/.claude.json` 中本项目的 mcpServers 配置
 - **做完一张卡的事就把卡标记 done**（update_task status=done）
 
-## 当前代码布局（v1，重构前）
+## 代码布局
 
 ```
-ShiftlyApp/Sources/ShiftlyKit/           领域核心（无 SwiftUI/AppKit）：Models、Paths、
-                                         ConfigLogic、DataStore、ScriptRunners
-ShiftlyApp/Sources/ShiftlyApp/           App：AppMain、AppModel、ContentView、
-                                         OverridesViews、HistoryViews
-ShiftlyApp/Tests/ShiftlyKitTests/        Swift Testing（import Testing，非 XCTest——
-                                         本机只有 CLT，跑法见 scripts/test.sh）
-scripts/schedule_core.py                 排班核心（Python，规则+换班+请假求解）
-scripts/planner.py                       排班核心的 CLI 入口（App 与菜单共用）
-scripts/main.applescript                 AppleScript 菜单（备用入口，Sync 调 App --sync）
-scripts/{report,work_history,apply_setup,needs_setup}.py   辅助脚本
-scripts/test.sh                          一键跑全部测试（python + applescript + swift）
-data/                                    JSON 数据（整目录 gitignore，schema 见 DATA_AND_API.md）
-launchd/com.shiftly.sync.plist           定时同步模板
+ShiftlyApp/Sources/ShiftlyKit/           领域核心（无 UI 依赖）：模型、同步引擎
+                                         （SyncEngine/Coordinator/EKCalendarStore）、
+                                         工资（PayEngine）、日志（WorkLogStore）、
+                                         FolderWatcher、DataStore/ConfigLogic
+ShiftlyApp/Sources/ShiftlyApp/           GUI：五区导航（今日/日历/工资/日志/设置）、
+                                         月历、规则管理、菜单栏、通知
+ShiftlyApp/Sources/shiftly/              CLI（JSON 输出，AI/脚本入口）
+ShiftlyApp/Tests/ShiftlyKitTests/        Swift Testing（74 用例；本机只有 CLT，
+                                         跑法见 scripts/test.sh）
+ShiftlyApp/Localization/zh-Hans.lproj/   中文翻译（英文键即兜底）
+packages/mcp-server/                     Shiftly MCP server（node，封装 CLI）
+scripts/schedule_core.py + planner.py    排班求解唯一真相源（Python）+ CLI 面
+scripts/main.applescript                 AppleScript 菜单（备用入口）
+scripts/{build_app,test}.sh              打包 dist/Shiftly.app / 一键全测试
+data/                                    JSON 数据（gitignore，schema 见 DATA_AND_API.md）
+launchd/com.shiftly.sync.plist           无人值守定时同步模板（调 Shiftly --sync）
 ```
 
 ## 常用命令
@@ -71,9 +75,10 @@ dist/Shiftly.app/Contents/MacOS/Shiftly --sync   # 无头同步（launchd/菜单
 ## 约定与坑
 
 - 排班求解算法唯一真相源是 schedule_core.py（planner.py 是它的 CLI 面）；
-  Swift 侧只叠加 manual_shifts / overrides 两类新数据，不复制算法（M6 CLI 落地时整体迁 Swift）；
-- 同步引擎是 ShiftlyKit 的 SyncEngine/SyncCoordinator（EventKit + eventIdentifier 映射），
-  AppleScript 同步链路已删除；旧 `[SF_SYNC]` 事件在首次同步时按迁移规则认领；
+  Swift 侧只叠加 manual_shifts / overrides，不复制算法；
+- 数据契约以 docs/DATA_AND_API.md 为准（改代码须同步改文档）；
 - 测试时别用真实 config.json / 真实日历（造临时根目录 + calendar_name 用测试名）；
 - 本机只有 CLT（无 Xcode/XCTest）：Swift 测试用 `import Testing`，跑法见 scripts/test.sh；
+  UserNotifications / SMAppService 仅在打包后的 .app 内生效；
+- 包内 CLI 叫 shiftly-cli（大小写不敏感文件系统会与主程序 Shiftly 撞名）；
 - 用户主语言中文，回复用中文。
