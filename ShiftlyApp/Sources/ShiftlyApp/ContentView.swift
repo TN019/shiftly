@@ -28,7 +28,7 @@ enum AppSection: String, CaseIterable, Identifiable {
 }
 
 struct ContentView: View {
-    @StateObject var model = AppModel()
+    @ObservedObject var model: AppModel
     @FocusState var timeFocus: TimeField?
     @FocusState var historySearchFocused: Bool
     @State var overridesListExpanded = false
@@ -422,6 +422,11 @@ struct ContentView: View {
                 .foregroundStyle(.tertiary)
         }
 
+        card("General") {
+            Toggle("Show in menu bar (keeps Shiftly running when the window is closed)", isOn: menuBarBinding)
+                .toggleStyle(.checkbox)
+        }
+
         card("Sync") {
             HStack(spacing: 14) {
                 Text("Auto-sync").font(.subheadline)
@@ -498,6 +503,13 @@ struct ContentView: View {
             }
             .padding(.vertical, 6)
         }
+    }
+
+    private var menuBarBinding: Binding<Bool> {
+        Binding(
+            get: { UserDefaults.standard.bool(forKey: menuBarEnabledKey) },
+            set: { UserDefaults.standard.set($0, forKey: menuBarEnabledKey) }
+        )
     }
 
     private func chooseDataFolder() {
