@@ -100,25 +100,18 @@ shiftly sync now [--window next_month]                    # 需已在 App 授权
 （2=参数/配置问题，3=资源不存在或权限，1=其他）。写数据后日历不会自动更新，
 需 `sync now` 或在 App 里 Sync。
 
-## 4. Shiftly MCP server（M6）
+## 4. Shiftly MCP server（M6，已实现）
 
-`packages/mcp-server/`（node + zod，参照 mingri 同名包的模式），stdio 传输，
-每个工具 = 一次 CLI 调用：
+`packages/mcp-server/`（node + zod，stdio），每个工具 = 一次 CLI 调用；
+工具面共 11 个：get_schedule / set_schedule / list_shifts / add_swap /
+add_leave / list_overrides / remove_override / pay_report / log_append /
+log_read / sync_now。详见 packages/mcp-server/README.md。
 
-| 工具 | 封装 |
-|------|------|
-| `get_schedule` / `set_schedule` | `shiftly schedule …` |
-| `list_shifts` | `shiftly shifts list …` |
-| `add_swap` / `add_leave` / `remove_override` | `shiftly swap/leave …` |
-| `pay_report` | `shiftly pay report …` |
-| `log_append` / `log_read` | `shiftly log …` |
-| `sync_now` | `shiftly sync now` |
-
-注册示例：
+注册示例（SHIFTLY_ROOT 指数据目录；CLI 路径缺省自动探测，也可用 SHIFTLY_CLI 指定）：
 
 ```bash
-claude mcp add shiftly -e SHIFTLY_ROOT=/Users/tn/dev/local/shifty \
-  -- node /Users/tn/dev/local/shifty/packages/mcp-server/index.js
+claude mcp add shiftly -e SHIFTLY_ROOT=/path/to/shiftly-data \
+  -- node /绝对路径/shiftly/packages/mcp-server/index.js
 ```
 
 ## 5. AI 直接编辑文件的守则（M6 文档化前的临时约定）
