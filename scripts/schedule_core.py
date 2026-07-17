@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 
-SUPPORTED_CONFIG_VERSION = 1
+SUPPORTED_CONFIG_VERSION = 2
 
 
 def repo_root() -> Path:
@@ -88,6 +88,53 @@ def planned_dates(cfg: dict, swaps: list, leave: list, start: dt.date, end: dt.d
             x += dt.timedelta(days=1)
 
     return shifts
+
+
+def planned_days_detailed(cfg: dict, swaps: list, leave: list, start: dt.date, end: dt.date) -> list[dict]:
+    """Like planned_dates, but with per-day provenance and shift type:
+    [{"date": date, "source": "rule"|"swap", "shift_type": str}, ...] sorted.
+
+    The shift type of a day is the type of the rule in effect on that day
+    (config_version 2 rules carry "shift_type"; absent -> "default"). A
+    swapped-in day uses the rule in effect on the day actually worked.
+    """
+    rules = sorted(cfg.get("rules", []), key=lambda r: r.get("effective_from", ""))
+
+    def rule_for(day: dt.date):
+        cur = None
+        for r in rules:
+            ef = r.get("effective_from")
+            if not ef:
+                continue
+            try:
+                if dt.date.fromisoformat(ef) <= day:
+                    cur = r
+            except ValueError:
+                continue
+        return cur
+
+    def type_for(day: dt.date) -> str:
+        r = rule_for(day)
+        return (r or {}).get("shift_type") or "default"
+
+    dates = planned_dates(cfg, swaps, leave, start, end)
+    swap_targets = set()
+    for s in swaps:
+        td = s.get("to_date")
+        try:
+            if td and dt.date.fromisoformat(td) in dates:
+                swap_targets.add(dt.date.fromisoformat(td))
+        except ValueError:
+            continue
+
+    return [
+        {
+            "date": d,
+            "source": "swap" if d in swap_targets else "rule",
+            "shift_type": type_for(d),
+        }
+        for d in sorted(dates)
+    ]
 
 
 def month_end(day: dt.date) -> dt.date:

@@ -3,10 +3,30 @@ import Foundation
 public struct Rule: Codable, Equatable {
     public var effective_from: String
     public var workdays: [String]
+    /// References a ShiftType id (config_version 2); nil means the default
+    /// times from config.
+    public var shift_type: String?
 
-    public init(effective_from: String, workdays: [String]) {
+    public init(effective_from: String, workdays: [String], shift_type: String? = nil) {
         self.effective_from = effective_from
         self.workdays = workdays
+        self.shift_type = shift_type
+    }
+}
+
+/// A named shift with its own times (config_version 2). Overnight shifts
+/// (end <= start) roll into the next day.
+public struct ShiftType: Codable, Equatable, Identifiable {
+    public var id: String
+    public var label: String
+    public var start: String
+    public var end: String
+
+    public init(id: String, label: String, start: String, end: String) {
+        self.id = id
+        self.label = label
+        self.start = start
+        self.end = end
     }
 }
 
@@ -19,6 +39,15 @@ public struct Config: Codable {
     public var history_csv: String?
     public var setup_completed: Bool?
     public var rules: [Rule]
+    public var shift_types: [ShiftType]?
+
+    /// Times for a shift-type id: matching type, else config defaults.
+    public func times(forShiftType id: String?) -> (start: String, end: String) {
+        if let id, let type = (shift_types ?? []).first(where: { $0.id == id }) {
+            return (type.start, type.end)
+        }
+        return (default_start_time, default_end_time)
+    }
 }
 
 public struct SwapItem: Codable, Identifiable, Equatable {

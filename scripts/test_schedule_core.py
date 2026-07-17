@@ -15,6 +15,7 @@ from schedule_core import (
     earliest_anchor_date,
     month_end,
     planned_dates,
+    planned_days_detailed,
     read_json,
     sync_range,
     work_history_payload,
@@ -106,6 +107,28 @@ class TestPlannedDates(unittest.TestCase):
         start, end = dt.date(2026, 1, 5), dt.date(2026, 1, 6)
         s = planned_dates(RULE_MO_TU, swaps, leave, start, end)
         self.assertEqual(s, {dt.date(2026, 1, 5), dt.date(2026, 1, 6)})
+
+
+class TestPlannedDaysDetailed(unittest.TestCase):
+    def test_source_and_type(self):
+        cfg = {"rules": [
+            {"effective_from": "2026-01-01", "workdays": ["MO", "TU"], "shift_type": "day"},
+            {"effective_from": "2026-01-12", "workdays": ["MO", "TU"], "shift_type": "night"},
+        ]}
+        swaps = [{"from_date": "2026-01-06", "to_date": "2026-01-08"}]
+        days = planned_days_detailed(cfg, swaps, [], dt.date(2026, 1, 5), dt.date(2026, 1, 13))
+        by_date = {d["date"].isoformat(): d for d in days}
+        self.assertEqual(by_date["2026-01-05"]["source"], "rule")
+        self.assertEqual(by_date["2026-01-05"]["shift_type"], "day")
+        self.assertEqual(by_date["2026-01-08"]["source"], "swap")
+        self.assertEqual(by_date["2026-01-08"]["shift_type"], "day", "swap-in day uses the rule active that day")
+        self.assertEqual(by_date["2026-01-12"]["shift_type"], "night", "new rule from its effective day")
+        self.assertNotIn("2026-01-06", by_date)
+
+    def test_missing_type_defaults(self):
+        cfg = {"rules": [{"effective_from": "2026-01-01", "workdays": ["MO"]}]}
+        days = planned_days_detailed(cfg, [], [], dt.date(2026, 1, 5), dt.date(2026, 1, 5))
+        self.assertEqual(days[0]["shift_type"], "default")
 
 
 class TestSyncRange(unittest.TestCase):
@@ -205,7 +228,7 @@ class TestPlannerCLI(unittest.TestCase):
 
     def test_shifts_output(self):
         out = self.run_planner("shifts", "--start", "2026-01-05", "--end", "2026-01-11").stdout
-        self.assertEqual(out.splitlines(), ["2026-01-05|auto", "2026-01-06|auto"])
+        self.assertEqual(out.splitlines(), ["2026-01-05|rule|default", "2026-01-06|rule|default"])
 
     def test_config_summary(self):
         out = self.run_planner("config-summary").stdout.splitlines()

@@ -51,7 +51,8 @@ public struct DataStore {
         startTime: String,
         endTime: String,
         effectiveFrom: String,
-        workdays: [String]
+        workdays: [String],
+        shiftType: String? = nil
     ) throws -> [Rule] {
         let raw = try ConfigLogic.readRawConfig(atPath: paths.configPath)
         let merged = ConfigLogic.mergeSchedule(
@@ -59,13 +60,36 @@ public struct DataStore {
             startTime: startTime,
             endTime: endTime,
             effectiveFrom: effectiveFrom,
-            workdays: workdays
+            workdays: workdays,
+            shiftType: shiftType
         )
         try ConfigLogic.writeRawConfig(merged, toPath: paths.configPath)
-        let rules = (merged["rules"] as? [[String: Any]]) ?? []
-        return rules.compactMap { dict in
+        return Self.rules(fromRaw: merged)
+    }
+
+    /// Delete a rule by its effective_from date; returns the new rule list.
+    @discardableResult
+    public func deleteRule(effectiveFrom: String) throws -> [Rule] {
+        let raw = try ConfigLogic.readRawConfig(atPath: paths.configPath)
+        let merged = ConfigLogic.deleteRule(from: raw, effectiveFrom: effectiveFrom)
+        try ConfigLogic.writeRawConfig(merged, toPath: paths.configPath)
+        return Self.rules(fromRaw: merged)
+    }
+
+    public func saveShiftTypes(_ types: [ShiftType]) throws {
+        let raw = try ConfigLogic.readRawConfig(atPath: paths.configPath)
+        let merged = ConfigLogic.mergeShiftTypes(into: raw, shiftTypes: types)
+        try ConfigLogic.writeRawConfig(merged, toPath: paths.configPath)
+    }
+
+    private static func rules(fromRaw raw: [String: Any]) -> [Rule] {
+        ((raw["rules"] as? [[String: Any]]) ?? []).compactMap { dict in
             guard let ef = dict["effective_from"] as? String else { return nil }
-            return Rule(effective_from: ef, workdays: (dict["workdays"] as? [String]) ?? [])
+            return Rule(
+                effective_from: ef,
+                workdays: (dict["workdays"] as? [String]) ?? [],
+                shift_type: dict["shift_type"] as? String
+            )
         }
     }
 
