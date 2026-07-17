@@ -1,6 +1,32 @@
 import ShiftlyKit
 import SwiftUI
 
+enum AppSection: String, CaseIterable, Identifiable {
+    case today, calendar, pay, log, settings
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .today: return "Today"
+        case .calendar: return "Calendar"
+        case .pay: return "Pay"
+        case .log: return "Log"
+        case .settings: return "Settings"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .today: return "sun.max"
+        case .calendar: return "calendar"
+        case .pay: return "dollarsign.circle"
+        case .log: return "text.book.closed"
+        case .settings: return "gearshape"
+        }
+    }
+}
+
 struct ContentView: View {
     @StateObject var model = AppModel()
     @FocusState var timeFocus: TimeField?
@@ -14,6 +40,14 @@ struct ContentView: View {
     @State var historyWeekdayFilter: Set<Int> = []
     @State var historyNewestFirst = false
     @State var historyActiveTool: HistoryTool? = nil
+    @AppStorage("shiftly.section") private var storedSection = AppSection.today.rawValue
+
+    private var sectionSelection: Binding<AppSection?> {
+        Binding(
+            get: { AppSection(rawValue: storedSection) ?? .today },
+            set: { storedSection = ($0 ?? .today).rawValue }
+        )
+    }
 
     enum TimeField: Hashable {
         case start
@@ -60,54 +94,18 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [Color(nsColor: .windowBackgroundColor), Color(nsColor: .underPageBackgroundColor)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    header
-                    if model.needsRootSetup {
-                        firstRunSection
-                    } else {
-                        weeklySection
-                        overridesSection
-                        syncReportSection
-                        historySection
-                        actions
-                    }
-                    if !model.statusMessage.isEmpty {
-                        HStack(spacing: 10) {
-                            Text(model.statusMessage)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                            if model.showSettingsHint {
-                                Button("Open Settings") {
-                                    model.openCalendarPrivacySettings()
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                            }
-                        }
-                        .padding(.top, 2)
-                    }
-                    Color.clear
-                        .frame(minHeight: 120)
-                        .frame(maxWidth: .infinity)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            resignAllFocus()
-                        }
+            NavigationSplitView {
+                List(AppSection.allCases, selection: sectionSelection) { section in
+                    Label(section.label, systemImage: section.systemImage)
+                        .tag(section)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .padding(.bottom, 28)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .navigationSplitViewColumnWidth(min: 165, ideal: 185, max: 230)
+                .listStyle(.sidebar)
+            } detail: {
+                detailPage(for: AppSection(rawValue: storedSection) ?? .today)
             }
-            .frame(minWidth: 780)
+            .navigationTitle("Shiftly")
+            .frame(minWidth: 860, minHeight: 560)
             .onExitCommand {
                 resignAllFocus()
             }
@@ -115,9 +113,6 @@ struct ContentView: View {
                 model.load()
                 model.startAutoSyncIfEnabled()
                 DispatchQueue.main.async {
-                    resignAllFocus()
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     resignAllFocus()
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
@@ -146,31 +141,105 @@ struct ContentView: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                        .stroke(Color.primary.opacity(0.12), lineWidth: 1)
                 )
             }
         }
     }
 
-    func resignAllFocus() {
-        timeFocus = nil
-        historySearchFocused = false
+    @ViewBuilder
+    private func detailPage(for section: AppSection) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                if model.needsRootSetup {
+                    firstRunSection
+                } else {
+                    switch section {
+                    case .today: todayPage
+                    case .calendar: calendarPage
+                    case .pay: payPage
+                    case .log: logPage
+                    case .settings: settingsPage
+                    }
+                }
+                if !model.statusMessage.isEmpty {
+                    HStack(spacing: 10) {
+                        Text(model.statusMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        if model.showSettingsHint {
+                            Button("Open Settings") {
+                                model.openCalendarPrivacySettings()
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+                    }
+                    .padding(.top, 2)
+                }
+                Color.clear
+                    .frame(minHeight: 60)
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        resignAllFocus()
+                    }
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    // MARK: Pages
+
+    @ViewBuilder
+    private var todayPage: some View {
+        header
+        nextShiftCard
+        weeklySection
+        overridesSection
+        syncReportSection
+        actions
+    }
+
+    @ViewBuilder
+    private var calendarPage: some View {
+        placeholderCard(
+            title: "Month View",
+            systemImage: "calendar",
+            text: "The month grid (shifts, swaps, leave at a glance) ships with the next update."
+        )
+        historySection
+    }
+
+    @ViewBuilder
+    private var payPage: some View {
+        placeholderCard(
+            title: "Pay",
+            systemImage: "dollarsign.circle",
+            text: "Pay tracking arrives in milestone M4: hourly rates, overtime and allowances, monthly charts, and payslip export."
+        )
+    }
+
+    @ViewBuilder
+    private var logPage: some View {
+        placeholderCard(
+            title: "Work Log",
+            systemImage: "text.book.closed",
+            text: "Markdown work logs arrive in milestone M5: daily notes in a folder of your choice, quick capture, and calendar integration."
+        )
     }
 
     private var header: some View {
         HStack {
             VStack(alignment: .leading, spacing: 3) {
-                Text("Shiftly").font(.title2).bold()
-                Text("Shifts calendar scheduler")
+                Text("Today").font(.title2).bold()
+                Text(Date().formatted(date: .complete, time: .omitted))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
-                .contentShape(Rectangle())
-                .frame(minHeight: 48)
-                .onTapGesture {
-                    resignAllFocus()
-                }
             HStack(spacing: 8) {
                 Circle().fill(statusColor).frame(width: 9, height: 9)
                 Text(statusLabel).fontWeight(.semibold)
@@ -185,6 +254,37 @@ struct ContentView: View {
         }
         .padding(.top, 4)
         .padding(.bottom, 4)
+    }
+
+    private var nextShiftCard: some View {
+        card("") {
+            HStack(spacing: 12) {
+                Image(systemName: "clock.badge.checkmark")
+                    .font(.title2)
+                    .foregroundStyle(Color.accentColor)
+                if let shift = model.nextShift {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Next shift")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("\(shift.start.formatted(date: .abbreviated, time: .shortened)) – \(shift.end.formatted(date: .omitted, time: .shortened))")
+                            .font(.title3.weight(.semibold))
+                            .monospacedDigit()
+                    }
+                    Spacer(minLength: 0)
+                    Text(shift.start > Date()
+                         ? shift.start.formatted(.relative(presentation: .named))
+                         : "in progress")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("No upcoming shift in the next 45 days")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                }
+            }
+        }
     }
 
     private var weeklySection: some View {
@@ -268,8 +368,40 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
                     .disabled(model.isBusy)
             }
+        }
+    }
+
+    // MARK: Settings page
+
+    @ViewBuilder
+    private var settingsPage: some View {
+        card("Calendar") {
             HStack(spacing: 14) {
-                Text("Auto-sync").font(.caption).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Calendar name").font(.caption).foregroundStyle(.secondary)
+                    TextField("Shifts", text: $model.calendarName)
+                        .frame(width: 180)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Event title").font(.caption).foregroundStyle(.secondary)
+                    TextField("Work Schedule", text: $model.eventTitle)
+                        .frame(width: 180)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(" ").font(.caption)
+                    Button("Save") { model.saveCalendarSettings() }
+                        .buttonStyle(.bordered)
+                }
+                Spacer(minLength: 0)
+            }
+            Text("Renaming the calendar makes the next sync create/claim a calendar with the new name; existing events in the old calendar are not moved.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+
+        card("Sync") {
+            HStack(spacing: 14) {
+                Text("Auto-sync").font(.subheadline)
                 Picker("", selection: $model.autoSyncHours) {
                     Text("Off").tag(0)
                     Text("Hourly").tag(1)
@@ -284,13 +416,32 @@ struct ContentView: View {
                     get: { model.launchAtLogin },
                     set: { model.setLaunchAtLogin($0) }
                 ))
-                .font(.caption)
                 .toggleStyle(.checkbox)
                 Spacer(minLength: 0)
-                Text("Auto-sync runs while Shiftly is open.")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
             }
+            Text("Auto-sync runs while Shiftly is open; pair it with Launch at login to survive reboots. Headless syncing without the app uses the launchd template (see README).")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+
+        card("Data Folder") {
+            HStack(spacing: 10) {
+                Text(model.paths.root)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 0)
+                Button("Show in Finder") {
+                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: model.paths.root)
+                }
+                .buttonStyle(.bordered)
+                Button("Change…") { chooseDataFolder() }
+                    .buttonStyle(.bordered)
+            }
+            Text("Changing the folder does not move existing data. The SHIFTLY_ROOT environment variable overrides this choice when set.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
     }
 
@@ -310,6 +461,22 @@ struct ContentView: View {
         }
     }
 
+    private func placeholderCard(title: String, systemImage: String, text: String) -> some View {
+        card(title) {
+            HStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.title2)
+                    .foregroundStyle(.secondary)
+                Text(text)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 6)
+        }
+    }
+
     private func chooseDataFolder() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
@@ -322,7 +489,12 @@ struct ContentView: View {
         }
     }
 
-    // MARK: shared helpers
+    // MARK: Shared helpers
+
+    func resignAllFocus() {
+        timeFocus = nil
+        historySearchFocused = false
+    }
 
     func card<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -334,10 +506,11 @@ struct ContentView: View {
             content()
         }
         .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
     }
 
@@ -372,11 +545,11 @@ struct ContentView: View {
         .padding(.vertical, 7)
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.white.opacity(0.07))
+                .fill(Color.primary.opacity(0.05))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 1)
         )
     }
 

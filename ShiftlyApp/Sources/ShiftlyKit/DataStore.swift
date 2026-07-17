@@ -69,6 +69,15 @@ public struct DataStore {
         }
     }
 
+    /// Merge calendar name/title into config.json (unknown keys preserved).
+    public func saveCalendarSettings(calendarName: String, eventTitle: String) throws {
+        let raw = try ConfigLogic.readRawConfig(atPath: paths.configPath)
+        let merged = ConfigLogic.mergeCalendarSettings(
+            into: raw, calendarName: calendarName, eventTitle: eventTitle
+        )
+        try ConfigLogic.writeRawConfig(merged, toPath: paths.configPath)
+    }
+
     private func writeJSON<T: Encodable>(_ value: T, to path: String) throws {
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]

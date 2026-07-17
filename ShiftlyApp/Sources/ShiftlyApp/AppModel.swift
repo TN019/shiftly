@@ -26,6 +26,9 @@ final class AppModel: ObservableObject {
     @Published var rulesSummary = ""
     @Published var lastReport: SyncReportFile?
     @Published var readbackLog: [ReadbackRecord] = []
+    @Published var calendarName = ""
+    @Published var eventTitle = ""
+    @Published var nextShift: PlannedShift?
 
     @Published private(set) var paths = ShiftlyPaths.shared
     private var store: DataStore { DataStore(paths: paths) }
@@ -64,6 +67,45 @@ final class AppModel: ObservableObject {
         loadMeta()
         loadSyncReport()
         refreshWorkHistory()
+        refreshNextShift()
+    }
+
+    /// Next planned shift from today onward (looks 45 days ahead).
+    func refreshNextShift() {
+        guard paths.isValid else {
+            nextShift = nil
+            return
+        }
+        let syncPaths = paths
+        Task { @MainActor in
+            let shift = await Task.detached(priority: .utility) { () -> PlannedShift? in
+                let df = DateFormatter()
+                df.dateFormat = "yyyy-MM-dd"
+                let today = df.string(from: Date())
+                let end = df.string(from: Date().addingTimeInterval(45 * 86400))
+                let source = SyncDataSource(
+                    store: DataStore(paths: syncPaths),
+                    provider: PlannerScriptProvider(root: syncPaths.root)
+                )
+                let shifts = (try? source.plannedShifts(start: today, end: end)) ?? []
+                let now = Date()
+                return shifts.first { $0.end > now }
+            }.value
+            nextShift = shift
+        }
+    }
+
+    func saveCalendarSettings() {
+        do {
+            try store.saveCalendarSettings(
+                calendarName: calendarName.trimmingCharacters(in: .whitespaces),
+                eventTitle: eventTitle.trimmingCharacters(in: .whitespaces)
+            )
+            syncState = .unsynced
+            statusMessage = "Settings saved."
+        } catch {
+            statusMessage = "Save settings failed: \(error.localizedDescription)"
+        }
     }
 
     func loadSyncReport() {
@@ -280,6 +322,8 @@ final class AppModel: ObservableObject {
             }
             startTime = config.default_start_time
             endTime = config.default_end_time
+            calendarName = config.calendar_name
+            eventTitle = config.event_title
             let sorted = config.rules.sorted { $0.effective_from < $1.effective_from }
             // Edit the newest rule; older ones are history and must be kept.
             if let latest = sorted.last {
