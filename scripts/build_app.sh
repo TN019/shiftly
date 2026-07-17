@@ -17,6 +17,11 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/scripts"
 
 cp "ShiftlyApp/.build/$CONFIG/ShiftlyApp" "$APP/Contents/MacOS/Shiftly"
+# CLI rides inside the bundle: Bundle.main then resolves to Shiftly.app, so
+# the bundled Python helpers are found without a repo checkout. Named
+# shiftly-cli because the filesystem is case-insensitive and "shiftly"
+# would collide with the app binary "Shiftly".
+cp "ShiftlyApp/.build/$CONFIG/shiftly" "$APP/Contents/MacOS/shiftly-cli"
 # Bundle the Python helpers so the app works without a repo checkout
 # (a scripts/ dir at the data root still takes precedence at runtime).
 cp scripts/planner.py scripts/schedule_core.py scripts/work_history.py \
