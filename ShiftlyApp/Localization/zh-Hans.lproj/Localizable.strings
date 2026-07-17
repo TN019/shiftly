@@ -291,3 +291,14 @@
 "Could not save log folder: %@" = "保存日志文件夹失败：%@";
 "Create the log folder first." = "请先创建日志文件夹。";
 "Could not create today's log." = "创建今日日志失败。";
+
+/* 日志快记与预览（M5） */
+"Quick note — appended to today's log with a timestamp" = "快记一条——带时间戳追加到今日日志";
+"Today's Log" = "今日日志";
+"Preview" = "预览";
+"Raw" = "原文";
+"Open in Editor" = "用编辑器打开";
+"No log for today yet — add a quick note above or open it in an editor to start." = "今天还没有日志——在上方快记一条，或用编辑器打开开始写。";
+"Edits made in other apps show up when Shiftly comes back to the front." = "在其他应用里的修改会在切回 Shiftly 时自动刷新。";
+"Logged." = "已记录。";
+"Quick capture failed: %@" = "快记失败：%@";
