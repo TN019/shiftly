@@ -180,4 +180,8 @@ Your data and synced calendar events are untouched by the rename; only names cha
 
 ## License
 
-See `LICENSE` in the repository root.
+[PolyForm Noncommercial 1.0.0](LICENSE) — free for personal and other
+noncommercial use (hobby, research, education, nonprofit); commercial use
+requires a separate license from the author.
+
+> Required Notice: Copyright (c) 2026 Blake Liu (https://github.com/TN019/shiftly)
