@@ -8,6 +8,7 @@ let package = Package(
     ],
     products: [
         .executable(name: "ShiftlyApp", targets: ["ShiftlyApp"]),
+        .executable(name: "shiftly", targets: ["shiftly"]),
         .library(name: "ShiftlyKit", targets: ["ShiftlyKit"]),
     ],
     targets: [
@@ -32,6 +33,12 @@ let package = Package(
                     "-Xlinker", "Sources/ShiftlyApp/Info.plist",
                 ])
             ]
+        ),
+        // AI/scripting entry point: every data operation, JSON output.
+        .executableTarget(
+            name: "shiftly",
+            dependencies: ["ShiftlyKit"],
+            path: "Sources/shiftly"
         ),
         .testTarget(
             name: "ShiftlyKitTests",

@@ -76,23 +76,29 @@ tags: []
 （正文，自由 Markdown）
 ```
 
-## 3. `shiftly` CLI（M6，AI 的统一入口）
+## 3. `shiftly` CLI（M6，已实现——AI 的统一入口）
 
-Swift executable target，复用 ShiftlyKit；**所有子命令支持 `--json`**；
-根目录用 `SHIFTLY_ROOT`（兼容读 `SHIFTY_ROOT`/`SHIFTFLOW_ROOT`）。
+Swift executable target（`ShiftlyApp/Sources/shiftly`），复用 ShiftlyKit；
+**输出恒为 JSON**（`--json` 兼容接受）；根目录解析与 App 一致
+（`SHIFTLY_ROOT` → App 记忆目录 → 可执行文件向上查找）。
+打包时随 Shiftly.app 分发：`dist/Shiftly.app/Contents/MacOS/shiftly-cli`
+（在包内运行可用内置 Python 脚本，数据目录无需仓库检出）。
 
 ```
-shiftly schedule show / set --workdays MO,TU --from 2026-08-01 --shift-type day
-shiftly swap add --from 2026-07-21 --to 2026-07-23 / list / remove <n>
-shiftly leave add --start 2026-07-25 --end 2026-07-27 / list / remove <n>
-shiftly shifts list --from 2026-07-01 --to 2026-07-31     # 求解后的实际班次
-shiftly pay report --month 2026-07                        # 工资分项明细
-shiftly log append "今天……" [--date 2026-07-16] / show / path
-shiftly sync now [--window month|next_month]
+shiftly schedule show
+shiftly schedule set --workdays MO,TU --from 2026-08-01 [--shift-type day] [--start HH:MM --end HH:MM]
+shiftly swap add --from 2026-07-21 --to 2026-07-23 | list | remove <index>
+shiftly leave add --start 2026-07-25 --end 2026-07-27 | list | remove <index>
+shiftly shifts list --from 2026-07-01 --to 2026-07-31     # 引擎求解后的实际班次
+shiftly pay report --month 2026-07                        # 工资明细（base_currency 计）
+shiftly log append "今天……" [--date 2026-07-16] | show | path
 shiftly report hours --period week|month
+shiftly sync now [--window next_month]                    # 需已在 App 授权日历
 ```
 
-约定：读操作退出码 0 + JSON stdout；写操作成功输出写入后的对象；错误 JSON 到 stderr + 非零退出码。
+约定：成功退出码 0 + JSON stdout；错误 `{"error": …}` 到 stderr + 非零退出码
+（2=参数/配置问题，3=资源不存在或权限，1=其他）。写数据后日历不会自动更新，
+需 `sync now` 或在 App 里 Sync。
 
 ## 4. Shiftly MCP server（M6）
 
