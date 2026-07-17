@@ -2,7 +2,7 @@
 ShiftlyApp/.build/
 .build/
 .swiftpm/
-Packages/
+ShiftlyApp/Packages/
 
 # Xcode (if you generate or open a project)
 *.xcodeproj/xcuserdata/
