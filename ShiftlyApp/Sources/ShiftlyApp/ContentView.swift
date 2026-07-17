@@ -44,6 +44,13 @@ struct ContentView: View {
     @State var calSelectedDay: SelectedDay? = nil
     @State var calSwapTarget: Date = Date()
     @State private var showScheduleManager = false
+    @State var paySetupCurrency = "AUD"
+    @State var paySetupHourly = ""
+    @State var paySetupDate = Date()
+    @State var payNewRate = ""
+    @State var payNewRateDate = Date()
+    @State var payExchangeEdits: [String: String] = [:]
+    @AppStorage("shiftly.payDisplayCurrency") var payDisplayCurrency = "AUD"
     @AppStorage("shiftly.section") private var storedSection = AppSection.today.rawValue
 
     private var sectionSelection: Binding<AppSection?> {
@@ -215,11 +222,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var payPage: some View {
-        placeholderCard(
-            title: "Pay",
-            systemImage: "dollarsign.circle",
-            text: "Pay tracking arrives in milestone M4: hourly rates, overtime and allowances, monthly charts, and payslip export."
-        )
+        paySection
     }
 
     @ViewBuilder

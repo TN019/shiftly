@@ -231,3 +231,29 @@
 
 /* 通知 */
 "Upcoming shift" = "即将上班";
+
+/* 工资（M4） */
+"Pay Setup" = "工资设置";
+"Set your hourly rate to start tracking earnings. Casual flat rate: pay = hours × rate; the rate history keeps past months correct after a raise." = "设置时薪即可开始统计收入。Casual 平率：工资 = 工时 × 时薪；调薪走费率历史，过去月份保持准确。";
+"Currency" = "货币";
+"Hourly rate" = "时薪";
+"Start Tracking" = "开始统计";
+"This month" = "本月";
+"Earnings" = "收入";
+"Hours" = "工时";
+"Shifts" = "班次数";
+"Calculating…" = "计算中…";
+"Some shifts predate the first rate segment and count as 0 — add an earlier rate to include them." = "部分班次早于第一段费率，按 0 计——补一段更早的费率即可计入。";
+"Converted from %@ at a manually set rate (edit below)." = "由 %@ 按手工汇率换算（在下方编辑）。";
+"Hourly Rates" = "时薪费率";
+"%@ %@ / h" = "%@ %@ / 小时";
+"Current" = "当前";
+"New rate" = "新费率";
+"A raise is a new segment; earlier months keep using the rate that applied back then." = "调薪即新增一段费率；更早的月份仍按当时的费率计算。";
+"Exchange Rates" = "汇率";
+"Manual multipliers from %@ for the display switcher (local only, never fetched)." = "以 %@ 为基准的手工汇率，仅用于显示切换（完全本地，不联网获取）。";
+"1 %@ =" = "1 %@ =";
+"Pay setup saved." = "工资设置已保存。";
+"Rate saved." = "费率已保存。";
+"Exchange rates saved." = "汇率已保存。";
+"Pay save failed: %@" = "工资配置保存失败：%@";
