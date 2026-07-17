@@ -51,6 +51,7 @@ struct ContentView: View {
     @State var payNewRateDate = Date()
     @State var payExchangeEdits: [String: String] = [:]
     @AppStorage("shiftly.payDisplayCurrency") var payDisplayCurrency = "AUD"
+    @State var paySelectedMonth: String? = nil
     @AppStorage("shiftly.section") private var storedSection = AppSection.today.rawValue
 
     private var sectionSelection: Binding<AppSection?> {

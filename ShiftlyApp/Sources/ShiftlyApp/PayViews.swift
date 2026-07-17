@@ -8,6 +8,8 @@ extension ContentView {
     var paySection: some View {
         if let config = model.payConfig {
             payMonthCard(config)
+            payChartCard(config)
+            payDrilldownCard(config)
             payRatesCard(config)
             payExchangeCard(config)
         } else {
@@ -98,6 +100,12 @@ extension ContentView {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Shifts").font(.caption).foregroundStyle(.secondary)
                         Text("\(breakdown.items.count)")
+                            .font(.system(.title2, design: .rounded).weight(.semibold))
+                            .monospacedDigit()
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Year to date").font(.caption).foregroundStyle(.secondary)
+                        Text(payAmountText(model.payYearToDate, config: config))
                             .font(.system(.title2, design: .rounded).weight(.semibold))
                             .monospacedDigit()
                     }
