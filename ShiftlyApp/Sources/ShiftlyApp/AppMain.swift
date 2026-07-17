@@ -14,6 +14,15 @@ final class ShiftlyAppDelegate: NSObject, NSApplicationDelegate {
 }
 
 @main
+enum ShiftlyEntry {
+    static func main() {
+        if CommandLine.arguments.contains("--sync") {
+            exit(HeadlessSync.run())
+        }
+        ShiftlyAppMain.main()
+    }
+}
+
 struct ShiftlyAppMain: App {
     @NSApplicationDelegateAdaptor(ShiftlyAppDelegate.self) private var appDelegate
 

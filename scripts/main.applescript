@@ -70,21 +70,36 @@ on overridesMenu()
 end overridesMenu
 
 on syncMenu()
-  set options to {"Sync Now", "View Sync Log", "Back"}
+  set options to {"Sync Now", "View Sync Report", "Back"}
   set picked to choose from list options with prompt "Sync actions" with title "Shiftly / Sync" default items {"Sync Now"}
   if picked is false then return
   set choice to item 1 of picked
   if choice is "Sync Now" then
     try
-      do shell script "export SHIFTLY_ROOT=" & quoted form of projectRoot & " && export SHIFTY_ROOT=" & quoted form of projectRoot & " && export SHIFTFLOW_ROOT=" & quoted form of projectRoot & " && /usr/bin/osascript " & quoted form of (projectRoot & "/scripts/sync.applescript")
-      display dialog "Sync completed." buttons {"OK"} default button "OK"
+      set appBinary to my findAppBinary()
+      set outText to do shell script "export SHIFTLY_ROOT=" & quoted form of projectRoot & " && " & quoted form of appBinary & " --sync"
+      display dialog "Sync completed." & linefeed & outText buttons {"OK"} default button "OK"
     on error errText
       display dialog "Sync failed: " & errText buttons {"OK"} default button "OK"
     end try
-  else if choice is "View Sync Log" then
-    my viewSyncLog()
+  else if choice is "View Sync Report" then
+    my viewSyncReport()
   end if
 end syncMenu
+
+-- Sync runs through the app binary (same EventKit engine as the GUI).
+-- Calendar access must have been granted to the app once via the GUI.
+on findAppBinary()
+  set candidates to {projectRoot & "/dist/Shiftly.app/Contents/MacOS/Shiftly", "/Applications/Shiftly.app/Contents/MacOS/Shiftly", projectRoot & "/ShiftlyApp/.build/release/ShiftlyApp", projectRoot & "/ShiftlyApp/.build/debug/ShiftlyApp"}
+  repeat with p in candidates
+    set candidatePath to contents of p
+    try
+      do shell script "test -x " & quoted form of candidatePath
+      return candidatePath
+    end try
+  end repeat
+  error "Shiftly binary not found. Build it first: scripts/build_app.sh"
+end findAppBinary
 
 on reportsMenu()
   set options to {"Weekly Hours", "Monthly Hours", "Back"}
@@ -157,15 +172,16 @@ on joinDelim(itemList, delim)
   return out
 end joinDelim
 
-on viewSyncLog()
-  set logPath to projectRoot & "/data/logs/sync.log"
+on viewSyncReport()
+  set metaPath to projectRoot & "/data/meta.json"
+  set reportPath to projectRoot & "/data/last_sync_report.json"
   try
-    set contentText to do shell script "test -f " & quoted form of logPath & " && tail -n 40 " & quoted form of logPath & " || echo '(no log yet)'"
-    display dialog contentText buttons {"OK"} default button "OK" with title "Sync Log (last 40 lines)"
+    set contentText to do shell script "for f in " & quoted form of metaPath & " " & quoted form of reportPath & "; do test -f \"$f\" && cat \"$f\" && printf '\\n'; done || echo '(no sync yet)'"
+    display dialog contentText buttons {"OK"} default button "OK" with title "Last Sync"
   on error errText
-    display dialog "Could not read log: " & errText buttons {"OK"} default button "OK"
+    display dialog "Could not read sync report: " & errText buttons {"OK"} default button "OK"
   end try
-end viewSyncLog
+end viewSyncReport
 
 on showHoursReport(periodKind)
   set cmd to "/usr/bin/python3 " & quoted form of (projectRoot & "/scripts/report.py") & " --period " & quoted form of periodKind

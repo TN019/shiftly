@@ -5,26 +5,20 @@
   <key>Label</key>
   <string>com.shiftly.sync</string>
 
+  <!-- Headless sync through the app binary (same EventKit engine as the
+       GUI). Grant Calendar access by syncing once from the app before
+       loading this job. -->
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/osascript</string>
-    <string>/CHANGE_ME/Shiftly/scripts/sync.applescript</string>
+    <string>/Applications/Shiftly.app/Contents/MacOS/Shiftly</string>
+    <string>--sync</string>
   </array>
 
   <key>EnvironmentVariables</key>
   <dict>
     <key>SHIFTLY_ROOT</key>
-    <string>/CHANGE_ME/Shiftly</string>
-    <!-- Legacy names kept while scripts still read them. -->
-    <key>SHIFTY_ROOT</key>
-    <string>/CHANGE_ME/Shiftly</string>
-    <key>SHIFTFLOW_ROOT</key>
-    <string>/CHANGE_ME/Shiftly</string>
+    <string>/CHANGE_ME/ShiftlyData</string>
     <key>SHIFTLY_SYNC_MODE</key>
-    <string>next_month</string>
-    <key>SHIFTY_SYNC_MODE</key>
-    <string>next_month</string>
-    <key>SHIFTFLOW_SYNC_MODE</key>
     <string>next_month</string>
   </dict>
 
@@ -39,10 +33,10 @@
   </dict>
 
   <key>StandardOutPath</key>
-  <string>/CHANGE_ME/Shiftly/data/logs/launchd.out.log</string>
+  <string>/tmp/com.shiftly.sync.out.log</string>
 
   <key>StandardErrorPath</key>
-  <string>/CHANGE_ME/Shiftly/data/logs/launchd.err.log</string>
+  <string>/tmp/com.shiftly.sync.err.log</string>
 
   <key>RunAtLoad</key>
   <false/>
