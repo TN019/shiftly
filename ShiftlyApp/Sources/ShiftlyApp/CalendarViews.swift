@@ -171,7 +171,7 @@ extension ContentView {
     private func legendItem(_ category: DayCategory) -> some View {
         HStack(spacing: 5) {
             Capsule().fill(category.color.opacity(0.85)).frame(width: 14, height: 4)
-            Text(category.label)
+            Text(L(category.label))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
@@ -188,7 +188,7 @@ extension ContentView {
                     .font(.subheadline.weight(.semibold))
             }
             HStack(spacing: 6) {
-                Text(category.label)
+                Text(L(category.label))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if let shift {

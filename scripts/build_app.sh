@@ -21,12 +21,16 @@ cp "ShiftlyApp/.build/$CONFIG/ShiftlyApp" "$APP/Contents/MacOS/Shiftly"
 # (a scripts/ dir at the data root still takes precedence at runtime).
 cp scripts/planner.py scripts/schedule_core.py scripts/work_history.py \
    "$APP/Contents/Resources/scripts/"
+# Localizations: keys are the English texts (fallback), zh-Hans is bundled.
+cp -R ShiftlyApp/Localization/zh-Hans.lproj "$APP/Contents/Resources/"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
   <key>CFBundleExecutable</key>
   <string>Shiftly</string>
   <key>CFBundleIdentifier</key>

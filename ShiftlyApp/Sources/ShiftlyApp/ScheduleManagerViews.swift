@@ -190,10 +190,10 @@ struct ScheduleManagerSheet: View {
                     TextField("18:30", text: $type.end)
                         .frame(width: 64)
                     let uses = model.ruleCount(usingShiftType: type.id)
-                    Text(uses == 1 ? "1 rule" : "\(uses) rules")
+                    Text(uses == 1 ? L("1 rule") : LF("%lld rules", uses))
                         .font(.caption)
                         .foregroundStyle(uses > 0 ? Color.orange : Color.secondary)
-                        .help(uses > 0 ? "Changing or removing this type affects \(uses) rule(s)" : "Unused")
+                        .help(uses > 0 ? LF("Changing or removing this type affects %lld rule(s)", uses) : L("Unused"))
                     Spacer(minLength: 0)
                     Button(role: .destructive) {
                         editedTypes.removeAll { $0.id == type.id }

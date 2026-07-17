@@ -87,7 +87,7 @@ extension ContentView {
     }
 
     private func reportCounts(_ report: SyncReportFile) -> String {
-        "+\(report.created) ~\(report.updated) -\(report.deleted) · \(report.readback_count) read back"
+        LF("+%lld ~%lld -%lld · %lld read back", report.created, report.updated, report.deleted, report.readback_count)
     }
 
     private func readbackIcon(_ kind: ReadbackRecord.Kind) -> String {
@@ -102,13 +102,13 @@ extension ContentView {
     private func readbackDescription(_ record: ReadbackRecord) -> String {
         switch record.kind {
         case .moved:
-            return "\(record.date) moved to \(record.to_date ?? "?") (swap)"
+            return LF("%@ moved to %@ (swap)", record.date, record.to_date ?? "?")
         case .retimed:
-            return "\(record.date) retimed to \(record.start ?? "?")–\(record.end ?? "?")"
+            return LF("%@ retimed to %@–%@", record.date, record.start ?? "?", record.end ?? "?")
         case .deleted:
-            return "\(record.date) removed in Calendar (day off)"
+            return LF("%@ removed in Calendar (day off)", record.date)
         case .newManual:
-            return "\(record.date) added in Calendar \(record.start ?? "?")–\(record.end ?? "?") (manual shift)"
+            return LF("%@ added in Calendar %@–%@ (manual shift)", record.date, record.start ?? "?", record.end ?? "?")
         }
     }
 }

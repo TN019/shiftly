@@ -38,7 +38,7 @@ enum NotificationScheduler {
 
         for item in items {
             let content = UNMutableNotificationContent()
-            content.title = item.title
+            content.title = L(item.title)
             content.body = item.body
             content.sound = .default
             let comps = Calendar.current.dateComponents(

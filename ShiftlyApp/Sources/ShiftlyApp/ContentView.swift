@@ -79,11 +79,11 @@ struct ContentView: View {
 
         var helpText: String {
             switch self {
-            case .period: return "Time period"
-            case .sort: return "Sort order"
-            case .quick: return "Quick range"
-            case .search: return "Search by date"
-            case .weekday: return "Weekday"
+            case .period: return L("Time period")
+            case .sort: return L("Sort order")
+            case .quick: return L("Quick range")
+            case .search: return L("Search by date")
+            case .weekday: return L("Weekday")
             }
         }
     }
@@ -272,11 +272,15 @@ struct ContentView: View {
                             .monospacedDigit()
                     }
                     Spacer(minLength: 0)
-                    Text(shift.start > Date()
-                         ? shift.start.formatted(.relative(presentation: .named))
-                         : "in progress")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    Group {
+                        if shift.start > Date() {
+                            Text(shift.start.formatted(.relative(presentation: .named)))
+                        } else {
+                            Text("in progress")
+                        }
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 } else {
                     Text("No upcoming shift in the next 45 days")
                         .font(.subheadline)
@@ -586,9 +590,9 @@ struct ContentView: View {
 
     private var statusLabel: String {
         switch model.syncState {
-        case .synced: return "Synced"
-        case .unsynced: return "Unsynced"
-        case .error: return "Error"
+        case .synced: return L("Synced")
+        case .unsynced: return L("Unsynced")
+        case .error: return L("Error")
         }
     }
 
