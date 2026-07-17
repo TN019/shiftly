@@ -228,11 +228,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var logPage: some View {
-        placeholderCard(
-            title: "Work Log",
-            systemImage: "text.book.closed",
-            text: "Markdown work logs arrive in milestone M5: daily notes in a folder of your choice, quick capture, and calendar integration."
-        )
+        logSection
     }
 
     private var header: some View {
@@ -503,6 +499,22 @@ struct ContentView: View {
                     .buttonStyle(.bordered)
             }
             Text("Changing the folder does not move existing data. The SHIFTLY_ROOT environment variable overrides this choice when set.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+
+        card("Work Log Folder") {
+            HStack(spacing: 10) {
+                Text(model.logDir)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 0)
+                Button("Change…") { chooseLogFolder() }
+                    .buttonStyle(.bordered)
+            }
+            Text("New logs go to the new folder; existing files are neither moved nor deleted.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }

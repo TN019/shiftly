@@ -271,3 +271,23 @@
 "Export Markdown…" = "导出 Markdown…";
 "Payslip exported to %@." = "工资单已导出到 %@。";
 "Export failed: %@" = "导出失败：%@";
+
+/* 工作日志（M5） */
+"Work Log" = "工作日志";
+"Daily Markdown logs live in a folder you own — one file per day (YYYY/YYYY-MM-DD.md) with the shift pre-filled, editable with any app." = "每日 Markdown 日志存放在你自己的文件夹——每天一个文件（YYYY/YYYY-MM-DD.md），自动填入当日班次，可用任何应用编辑。";
+"Create This Folder" = "创建此文件夹";
+"Choose Another…" = "选择其他…";
+"Today's log" = "今日日志";
+"Exists — open to keep writing." = "已存在——打开继续写。";
+"Not created yet — opening creates it with today's shift pre-filled." = "尚未创建——打开时自动创建并填入今日班次。";
+"Open Today's Log" = "打开今日日志";
+"Quick capture and in-app preview arrive with the next update." = "快记与应用内预览将在下一个更新中提供。";
+"Choose the folder for your work logs." = "选择存放工作日志的文件夹。";
+"Work Log Folder" = "日志文件夹";
+"New logs go to the new folder; existing files are neither moved nor deleted." = "新日志写入新文件夹；既有文件不会被移动或删除。";
+"Log folder created." = "日志文件夹已创建。";
+"Could not create log folder: %@" = "创建日志文件夹失败：%@";
+"Log folder updated. Existing logs stay in the old folder." = "日志文件夹已更新。旧日志保留在原文件夹。";
+"Could not save log folder: %@" = "保存日志文件夹失败：%@";
+"Create the log folder first." = "请先创建日志文件夹。";
+"Could not create today's log." = "创建今日日志失败。";

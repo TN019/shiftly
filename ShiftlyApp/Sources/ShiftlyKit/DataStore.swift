@@ -93,6 +93,13 @@ public struct DataStore {
         }
     }
 
+    /// Set the work-log folder in config.json (unknown keys preserved).
+    public func saveLogDir(_ dir: String) throws {
+        var raw = try ConfigLogic.readRawConfig(atPath: paths.configPath)
+        raw["log_dir"] = dir
+        try ConfigLogic.writeRawConfig(raw, toPath: paths.configPath)
+    }
+
     /// Merge calendar name/title into config.json (unknown keys preserved).
     public func saveCalendarSettings(calendarName: String, eventTitle: String) throws {
         let raw = try ConfigLogic.readRawConfig(atPath: paths.configPath)
