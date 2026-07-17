@@ -35,16 +35,16 @@
 ```
 
 ```jsonc
-// pay.json（M4，新文件）：薪资模型，全部字段 effective_from 分段
+// pay.json（M4，已实现）：casual 平率薪资模型（2026-07-17 与用户确认最简方案）
+// 金额一律以 base_currency 记账；display_rates 是手工维护的显示换算（不联网）。
+// 工时按真实起止计（跨午夜足额），班次归属开始日；
+// 时薪取 effective_from ≤ 班次日期 的最新一段，早于首段的班次计 0 并在 UI 标记。
 {
   "version": 1,
-  "currency": "AUD",
+  "base_currency": "AUD",
   "rates": [ { "effective_from": "2026-01-01", "hourly": 32.5 } ],
-  "overtime": { "daily_after_hours": 8, "multiplier": 1.5 },
-  "allowances": [
-    { "kind": "night", "applies_to_shift_type": "night", "per_hour": 4.0 },
-    { "kind": "holiday", "dates": ["2026-12-25"], "multiplier": 2.0 }
-  ]
+  "display_rates": { "CNY": 4.7, "USD": 0.66 }
+  // 预留扩展位（本期不实现）：overtime / allowances
 }
 ```
 

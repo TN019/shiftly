@@ -37,6 +37,8 @@ final class AppModel: ObservableObject {
     /// overrides + manual), never a re-implementation.
     @Published var monthShifts: [String: PlannedShift] = [:]
     private var monthRange: (start: String, end: String)?
+    @Published var payConfig: PayConfig?
+    @Published var payCurrentMonth: PayBreakdown?
 
     @Published private(set) var paths = ShiftlyPaths.shared
     private var store: DataStore { DataStore(paths: paths) }
@@ -79,6 +81,72 @@ final class AppModel: ObservableObject {
         refreshNextShift()
         if let range = monthRange {
             loadMonth(start: range.start, end: range.end)
+        }
+        payConfig = store.loadPayConfig()
+        refreshPayMonth()
+    }
+
+    // MARK: Pay
+
+    /// Earnings for the current month (same solver as calendar/sync).
+    func refreshPayMonth() {
+        guard paths.isValid, let config = payConfig else {
+            payCurrentMonth = nil
+            return
+        }
+        let syncPaths = paths
+        Task { @MainActor in
+            let breakdown = await Task.detached(priority: .utility) { () -> PayBreakdown in
+                let cal = Calendar.current
+                let now = Date()
+                let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: now)) ?? now
+                let dayCount = cal.range(of: .day, in: .month, for: monthStart)?.count ?? 28
+                let monthEnd = cal.date(byAdding: .day, value: dayCount - 1, to: monthStart) ?? now
+                let df = DateFormatter()
+                df.dateFormat = "yyyy-MM-dd"
+                let source = SyncDataSource(
+                    store: DataStore(paths: syncPaths),
+                    provider: PlannerScriptProvider(root: syncPaths.root)
+                )
+                let shifts = (try? source.plannedShifts(
+                    start: df.string(from: monthStart), end: df.string(from: monthEnd)
+                )) ?? []
+                return PayEngine.breakdown(shifts: shifts, config: config)
+            }.value
+            payCurrentMonth = breakdown
+        }
+    }
+
+    func createPayConfig(baseCurrency: String, hourly: Double, effectiveFrom: String) {
+        let config = PayConfig(
+            base_currency: baseCurrency,
+            rates: [PayRate(effective_from: effectiveFrom, hourly: hourly)]
+        )
+        savePay(config, successMessage: L("Pay setup saved."))
+    }
+
+    func addPayRate(hourly: Double, effectiveFrom: String) {
+        guard var config = payConfig else { return }
+        config.rates.removeAll { $0.effective_from == effectiveFrom }
+        config.rates.append(PayRate(effective_from: effectiveFrom, hourly: hourly))
+        config.rates.sort { $0.effective_from < $1.effective_from }
+        savePay(config, successMessage: L("Rate saved."))
+    }
+
+    func updateDisplayRates(_ rates: [String: Double]) {
+        guard var config = payConfig else { return }
+        config.display_rates = rates
+        savePay(config, successMessage: L("Exchange rates saved."))
+    }
+
+    private func savePay(_ config: PayConfig, successMessage: String) {
+        do {
+            try store.savePayConfig(config)
+            payConfig = config
+            statusMessage = successMessage
+            refreshPayMonth()
+        } catch {
+            statusMessage = LF("Pay save failed: %@", error.localizedDescription)
         }
     }
 
