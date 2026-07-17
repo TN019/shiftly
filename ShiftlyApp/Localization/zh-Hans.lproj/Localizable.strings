@@ -313,3 +313,6 @@
 "Open log" = "打开日志";
 "Set up the log folder in the Log section first" = "请先在「日志」区设置日志文件夹";
 "Could not create the log." = "创建日志失败。";
+
+/* 文件监听（M6） */
+"Data changed on disk — reloaded." = "磁盘数据有外部变更——已自动刷新。";
