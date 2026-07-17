@@ -302,3 +302,14 @@
 "Edits made in other apps show up when Shiftly comes back to the front." = "在其他应用里的修改会在切回 Shiftly 时自动刷新。";
 "Logged." = "已记录。";
 "Quick capture failed: %@" = "快记失败：%@";
+
+/* 日志搜索与日历联动（M5） */
+"Search Logs" = "搜索日志";
+"Keyword — matches frontmatter and body" = "关键词——匹配 frontmatter 与正文";
+"Date range" = "日期范围";
+"Search" = "搜索";
+"No matches." = "没有匹配结果。";
+"Has a log entry" = "这天有日志";
+"Open log" = "打开日志";
+"Set up the log folder in the Log section first" = "请先在「日志」区设置日志文件夹";
+"Could not create the log." = "创建日志失败。";

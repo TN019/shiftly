@@ -54,6 +54,11 @@ struct ContentView: View {
     @State var paySelectedMonth: String? = nil
     @State var logQuickText = ""
     @State var logShowRaw = false
+    @State var logSearchQuery = ""
+    @State var logSearchUseRange = false
+    @State var logSearchFrom = Calendar.current.date(byAdding: .month, value: -3, to: Date()) ?? Date()
+    @State var logSearchTo = Date()
+    @State var logSearchRan = false
     @AppStorage("shiftly.section") private var storedSection = AppSection.today.rawValue
 
     private var sectionSelection: Binding<AppSection?> {

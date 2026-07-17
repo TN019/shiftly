@@ -123,6 +123,12 @@ extension ContentView {
                             Circle().fill(isToday ? Color.accentColor.opacity(0.18) : Color.clear)
                         )
                     Spacer(minLength: 0)
+                    if model.monthLogDates.contains(ymd) {
+                        Image(systemName: "square.and.pencil")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .help(Text("Has a log entry"))
+                    }
                 }
                 Spacer(minLength: 0)
                 if let shift {
@@ -245,10 +251,13 @@ extension ContentView {
                 .buttonStyle(.bordered)
             }
 
-            Button("Write log entry") {}
-                .buttonStyle(.bordered)
-                .disabled(true)
-                .help("Work logs arrive in milestone M5")
+            Button(model.monthLogDates.contains(ymd) ? "Open log" : "Write log entry") {
+                calSelectedDay = nil
+                model.openLog(date: ymd)
+            }
+            .buttonStyle(.bordered)
+            .disabled(!model.logDirExists)
+            .help(model.logDirExists ? "" : "Set up the log folder in the Log section first")
         }
         .padding(14)
         .frame(minWidth: 240)

@@ -7,9 +7,80 @@ extension ContentView {
         if model.logDirExists {
             logQuickCaptureCard
             logTodayCard
+            logSearchCard
         } else {
             logSetupCard
         }
+    }
+
+    // MARK: Search
+
+    private var logSearchCard: some View {
+        card("Search Logs") {
+            HStack(spacing: 10) {
+                TextField("Keyword — matches frontmatter and body", text: $logSearchQuery)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { runLogSearch() }
+                Toggle("Date range", isOn: $logSearchUseRange)
+                    .toggleStyle(.checkbox)
+                    .font(.caption)
+                if logSearchUseRange {
+                    styledDatePicker($logSearchFrom)
+                    styledDatePicker($logSearchTo)
+                }
+                Button("Search") { runLogSearch() }
+                    .buttonStyle(.bordered)
+                    .disabled(logSearchQuery.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            if !model.logSearchResults.isEmpty {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(model.logSearchResults) { hit in
+                            Button {
+                                model.openLog(date: hit.date)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Text(hit.date)
+                                        .font(.system(.subheadline, design: .monospaced))
+                                    Text(hit.snippet)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                    Spacer(minLength: 0)
+                                    Image(systemName: "arrow.up.forward.square")
+                                        .font(.caption)
+                                        .foregroundStyle(.tertiary)
+                                }
+                                .padding(.vertical, 5)
+                                .padding(.horizontal, 10)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color.primary.opacity(0.05))
+                            )
+                        }
+                    }
+                }
+                .frame(maxHeight: 200)
+            } else if logSearchRan {
+                Text("No matches.")
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private func runLogSearch() {
+        let query = logSearchQuery.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return }
+        logSearchRan = true
+        model.searchLogs(
+            query: query,
+            from: logSearchUseRange ? ContentView.ymdString(logSearchFrom) : nil,
+            to: logSearchUseRange ? ContentView.ymdString(logSearchTo) : nil
+        )
     }
 
     private var logSetupCard: some View {

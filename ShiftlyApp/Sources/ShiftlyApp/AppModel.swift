@@ -43,6 +43,9 @@ final class AppModel: ObservableObject {
     @Published var logDirExists = false
     /// Content of today's log file; nil = not created yet.
     @Published var todayLogContent: String?
+    /// Days with a log file in the calendar's displayed month.
+    @Published var monthLogDates: Set<String> = []
+    @Published var logSearchResults: [WorkLogStore.SearchHit] = []
     /// Last 12 months (oldest first), empty months included with zero totals.
     @Published var payMonths: [MonthPay] = []
     /// Sum of the current calendar year's earnings (base currency).
@@ -309,7 +312,53 @@ final class AppModel: ObservableObject {
             // Only publish if this is still the month being displayed.
             if monthRange?.start == start {
                 monthShifts = shifts
+                monthLogDates = logStore.datesWithLogs(inMonth: String(start.prefix(7)))
             }
+        }
+    }
+
+    /// Open (creating if needed) the log for any date; frontmatter is
+    /// pre-filled from that day's plan.
+    func openLog(date: String) {
+        guard logDirExists else {
+            statusMessage = L("Create the log folder first.")
+            return
+        }
+        let syncPaths = paths
+        let dir = logDir
+        Task { @MainActor in
+            let path = await Task.detached(priority: .utility) { () -> String? in
+                let source = SyncDataSource(
+                    store: DataStore(paths: syncPaths),
+                    provider: PlannerScriptProvider(root: syncPaths.root)
+                )
+                let planned = (try? source.plannedShifts(start: date, end: date)) ?? []
+                let days = (try? PlannerScriptProvider(root: syncPaths.root)
+                    .plannedDays(start: date, end: date)) ?? []
+                return try? WorkLogStore(rootDir: dir).ensureFile(
+                    date: date,
+                    shift: planned.first,
+                    shiftType: planned.first?.kind == .manual ? "manual" : days.first?.shiftType
+                )
+            }.value
+            if let path {
+                monthLogDates.insert(date)
+                if date == Self.todayYMD() {
+                    todayLogContent = logStore.read(date: date)
+                }
+                NSWorkspace.shared.open(URL(fileURLWithPath: path))
+            } else {
+                statusMessage = L("Could not create the log.")
+            }
+        }
+    }
+
+    func searchLogs(query: String, from: String?, to: String?) {
+        let dir = logDir
+        Task { @MainActor in
+            logSearchResults = await Task.detached(priority: .utility) {
+                WorkLogStore(rootDir: dir).search(query: query, from: from, to: to)
+            }.value
         }
     }
 
