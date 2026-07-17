@@ -28,6 +28,8 @@ cp scripts/planner.py scripts/schedule_core.py scripts/work_history.py \
    "$APP/Contents/Resources/scripts/"
 # Localizations: keys are the English texts (fallback), zh-Hans is bundled.
 cp -R ShiftlyApp/Localization/zh-Hans.lproj "$APP/Contents/Resources/"
+# App icon (regenerate with: swift scripts/make_icon.swift + iconutil).
+cp assets/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -42,12 +44,14 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <string>com.shiftly.app</string>
   <key>CFBundleName</key>
   <string>Shiftly</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
   <key>CFBundleDisplayName</key>
   <string>Shiftly</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.3.0</string>
+  <string>0.7.0</string>
   <key>CFBundleVersion</key>
   <string>1</string>
   <key>LSMinimumSystemVersion</key>
