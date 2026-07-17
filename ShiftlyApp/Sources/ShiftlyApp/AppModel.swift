@@ -60,6 +60,48 @@ final class AppModel: ObservableObject {
     @Published private(set) var paths = ShiftlyPaths.shared
     private var store: DataStore { DataStore(paths: paths) }
 
+    // MARK: External file change watching
+
+    private var watcher: FolderWatcher?
+    /// Events until this instant are ours (self-write suppression).
+    private var suppressWatcherUntil = Date.distantPast
+
+    /// Call after any write this app performs, so the watcher does not
+    /// re-trigger a reload for our own file activity.
+    func noteOwnWrite() {
+        suppressWatcherUntil = Date().addingTimeInterval(2)
+    }
+
+    /// Watch data/ and the log folder; external edits reload the UI and
+    /// flag the state as unsynced (a corrupt half-written file just loads
+    /// as defaults and the writer's final event triggers another reload).
+    func startWatching() {
+        watcher?.stop()
+        guard paths.isValid else { return }
+        watcher = FolderWatcher(paths: ["\(paths.root)/data", logDir]) { [weak self] changed in
+            Task { @MainActor [weak self] in
+                self?.handleExternalChange(changed)
+            }
+        }
+        watcher?.start()
+    }
+
+    private func handleExternalChange(_ changedPaths: [String]) {
+        guard Date() >= suppressWatcherUntil else { return }
+        // A headless `shiftly sync now` also writes here; its meta/state
+        // files identify it, and loadMeta then reports the true state.
+        let syncArtifacts = ["meta.json", "sync_state.json", "last_sync_report", "readback_log"]
+        let wasSync = changedPaths.contains { path in
+            syncArtifacts.contains { path.contains($0) }
+        }
+        noteOwnWrite() // our own reload must not re-trigger the watcher
+        load()
+        if !wasSync {
+            syncState = .unsynced
+            statusMessage = L("Data changed on disk — reloaded.")
+        }
+    }
+
     /// True when no data root could be resolved: the first-run view is shown.
     var needsRootSetup: Bool { !paths.isValid }
 
@@ -73,6 +115,7 @@ final class AppModel: ObservableObject {
             paths = ShiftlyPaths(root: root)
             statusMessage = L("Data folder ready. Set your weekly schedule, then Sync Now.")
             load()
+            startWatching()
         } catch {
             statusMessage = LF("Could not prepare data folder: %@", error.localizedDescription)
         }
@@ -102,6 +145,9 @@ final class AppModel: ObservableObject {
         payConfig = store.loadPayConfig()
         refreshPayMonth()
         refreshLogState()
+        if watcher == nil {
+            startWatching()
+        }
     }
 
     // MARK: Work log
@@ -119,6 +165,7 @@ final class AppModel: ObservableObject {
 
     /// Append a timestamped entry to today's log (created on demand).
     func quickCapture(_ text: String) {
+        noteOwnWrite()
         let entry = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !entry.isEmpty else { return }
         guard logDirExists else {
@@ -149,6 +196,7 @@ final class AppModel: ObservableObject {
 
     /// Create the log folder (first use) at the current location.
     func createLogDir() {
+        noteOwnWrite()
         do {
             try FileManager.default.createDirectory(atPath: logDir, withIntermediateDirectories: true)
             refreshLogState()
@@ -161,9 +209,11 @@ final class AppModel: ObservableObject {
     /// Point config at a different log folder. Existing files are neither
     /// moved nor deleted.
     func adoptLogDir(_ url: URL) {
+        noteOwnWrite()
         do {
             try store.saveLogDir(url.path)
             refreshLogState()
+            startWatching()
             statusMessage = L("Log folder updated. Existing logs stay in the old folder.")
         } catch {
             statusMessage = LF("Could not save log folder: %@", error.localizedDescription)
@@ -194,6 +244,7 @@ final class AppModel: ObservableObject {
     }
 
     func openTodayLog() {
+        noteOwnWrite()
         guard paths.isValid else { return }
         guard logDirExists else {
             statusMessage = L("Create the log folder first.")
@@ -282,6 +333,7 @@ final class AppModel: ObservableObject {
     }
 
     private func savePay(_ config: PayConfig, successMessage: String) {
+        noteOwnWrite()
         do {
             try store.savePayConfig(config)
             payConfig = config
@@ -320,6 +372,7 @@ final class AppModel: ObservableObject {
     /// Open (creating if needed) the log for any date; frontmatter is
     /// pre-filled from that day's plan.
     func openLog(date: String) {
+        noteOwnWrite()
         guard logDirExists else {
             statusMessage = L("Create the log folder first.")
             return
@@ -424,6 +477,7 @@ final class AppModel: ObservableObject {
     }
 
     func saveCalendarSettings() {
+        noteOwnWrite()
         do {
             try store.saveCalendarSettings(
                 calendarName: calendarName.trimmingCharacters(in: .whitespaces),
@@ -443,6 +497,7 @@ final class AppModel: ObservableObject {
 
     func undoReadback(_ record: ReadbackRecord) {
         guard !isBusy else { return }
+        noteOwnWrite()
         do {
             let undoService = ReadbackUndoService(
                 store: store,
@@ -462,6 +517,7 @@ final class AppModel: ObservableObject {
     }
 
     func saveSchedule() {
+        noteOwnWrite()
         do {
             let df = DateFormatter()
             df.dateFormat = "yyyy-MM-dd"
@@ -484,6 +540,7 @@ final class AppModel: ObservableObject {
 
     /// Add or replace a rule from the timeline editor.
     func upsertRule(effectiveFrom: String, workdays: [String], shiftType: String?) {
+        noteOwnWrite()
         do {
             let updated = try store.saveSchedule(
                 startTime: startTime,
@@ -505,6 +562,7 @@ final class AppModel: ObservableObject {
     /// Delete a not-yet-effective rule. Rules already in effect are history
     /// and stay read-only.
     func deleteRule(effectiveFrom: String) {
+        noteOwnWrite()
         guard effectiveFrom > Self.todayYMD() else {
             statusMessage = L("Rules already in effect are history and cannot be deleted.")
             return
@@ -527,6 +585,7 @@ final class AppModel: ObservableObject {
     }
 
     func saveShiftTypes(_ types: [ShiftType]) {
+        noteOwnWrite()
         do {
             try store.saveShiftTypes(types)
             shiftTypes = types
@@ -548,6 +607,7 @@ final class AppModel: ObservableObject {
     }
 
     func addSwap() {
+        noteOwnWrite()
         do {
             var list = try store.loadSwaps()
             let df = DateFormatter()
@@ -563,6 +623,7 @@ final class AppModel: ObservableObject {
     }
 
     func addLeave() {
+        noteOwnWrite()
         do {
             var list = try store.loadLeaves()
             let df = DateFormatter()
@@ -578,6 +639,7 @@ final class AppModel: ObservableObject {
     }
 
     func deleteSwap(id: UUID) {
+        noteOwnWrite()
         guard swaps.contains(where: { $0.id == id }) else { return }
         swaps.removeAll { $0.id == id }
         do {
@@ -589,6 +651,7 @@ final class AppModel: ObservableObject {
     }
 
     func deleteLeave(id: UUID) {
+        noteOwnWrite()
         guard leaves.contains(where: { $0.id == id }) else { return }
         leaves.removeAll { $0.id == id }
         do {
@@ -639,6 +702,7 @@ final class AppModel: ObservableObject {
                     )
                     return try coordinator.sync()
                 }.value
+                noteOwnWrite()
                 load()
                 syncState = .synced
                 statusMessage = Self.syncSummary(outcome)
