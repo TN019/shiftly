@@ -265,3 +265,9 @@
 "Year to date" = "本年累计";
 "No shifts this month." = "该月没有班次。";
 "no rate" = "无费率";
+
+/* 工资单导出（M4） */
+"Export CSV…" = "导出 CSV…";
+"Export Markdown…" = "导出 Markdown…";
+"Payslip exported to %@." = "工资单已导出到 %@。";
+"Export failed: %@" = "导出失败：%@";

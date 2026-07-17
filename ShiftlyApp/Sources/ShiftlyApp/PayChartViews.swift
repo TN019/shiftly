@@ -97,6 +97,18 @@ extension ContentView {
                             .monospacedDigit()
                     }
                     .padding(.top, 4)
+                    HStack(spacing: 10) {
+                        Button("Export CSV…") {
+                            exportPayslip(month: month ?? "", breakdown: data, config: config, format: "csv")
+                        }
+                        .buttonStyle(.bordered)
+                        Button("Export Markdown…") {
+                            exportPayslip(month: month ?? "", breakdown: data, config: config, format: "md")
+                        }
+                        .buttonStyle(.bordered)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.top, 2)
                 }
             }
         }
@@ -130,6 +142,25 @@ extension ContentView {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(Color.primary.opacity(0.05))
         )
+    }
+
+    // MARK: Export
+
+    private func exportPayslip(month: String, breakdown: PayBreakdown, config: PayConfig, format: String) {
+        let content = format == "csv"
+            ? PayslipExporter.csv(month: month, breakdown: breakdown, config: config, displayCurrency: payDisplayCurrency)
+            : PayslipExporter.markdown(month: month, breakdown: breakdown, config: config, displayCurrency: payDisplayCurrency)
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "shiftly-payslip-\(month).\(format)"
+        panel.canCreateDirectories = true
+        if panel.runModal() == .OK, let url = panel.url {
+            do {
+                try Data(content.utf8).write(to: url, options: .atomic)
+                model.statusMessage = LF("Payslip exported to %@.", url.lastPathComponent)
+            } catch {
+                model.statusMessage = LF("Export failed: %@", error.localizedDescription)
+            }
+        }
     }
 
     // MARK: Labels
