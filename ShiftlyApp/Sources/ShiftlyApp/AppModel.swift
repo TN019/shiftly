@@ -41,6 +41,8 @@ final class AppModel: ObservableObject {
     @Published var payCurrentMonth: PayBreakdown?
     @Published var logDir: String = (WorkLogStore.defaultDir as NSString).expandingTildeInPath
     @Published var logDirExists = false
+    /// Content of today's log file; nil = not created yet.
+    @Published var todayLogContent: String?
     /// Last 12 months (oldest first), empty months included with zero totals.
     @Published var payMonths: [MonthPay] = []
     /// Sum of the current calendar year's earnings (base currency).
@@ -109,6 +111,37 @@ final class AppModel: ObservableObject {
         let configured = (try? store.loadConfig())?.log_dir ?? WorkLogStore.defaultDir
         logDir = (configured as NSString).expandingTildeInPath
         logDirExists = logStore.rootExists
+        todayLogContent = logStore.read(date: Self.todayYMD())
+    }
+
+    /// Append a timestamped entry to today's log (created on demand).
+    func quickCapture(_ text: String) {
+        let entry = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !entry.isEmpty else { return }
+        guard logDirExists else {
+            statusMessage = L("Create the log folder first.")
+            return
+        }
+        Task { @MainActor in
+            guard await ensureTodayLog() != nil else {
+                statusMessage = L("Could not create today's log.")
+                return
+            }
+            let hhmm = SyncFingerprint.hhmmString(for: Date())
+            do {
+                try logStore.append(
+                    entry: entry,
+                    date: Self.todayYMD(),
+                    timeHHMM: hhmm,
+                    shift: nil,
+                    shiftType: nil
+                )
+                todayLogContent = logStore.read(date: Self.todayYMD())
+                statusMessage = L("Logged.")
+            } catch {
+                statusMessage = LF("Quick capture failed: %@", error.localizedDescription)
+            }
+        }
     }
 
     /// Create the log folder (first use) at the current location.
@@ -165,6 +198,7 @@ final class AppModel: ObservableObject {
         }
         Task { @MainActor in
             if let path = await ensureTodayLog() {
+                todayLogContent = logStore.read(date: Self.todayYMD())
                 NSWorkspace.shared.open(URL(fileURLWithPath: path))
             } else {
                 statusMessage = L("Could not create today's log.")
