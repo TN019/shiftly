@@ -126,7 +126,7 @@ extension ContentView {
                 .foregroundStyle(.tertiary)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(Capsule().fill(Color.white.opacity(0.08)))
+                .background(Capsule().fill(Color.primary.opacity(0.08)))
             Text(displayDate(fromISO: item.from_date))
                 .font(.system(.body, design: .rounded).weight(.medium).monospacedDigit())
             Image(systemName: "arrow.right")
@@ -147,7 +147,7 @@ extension ContentView {
         .padding(.horizontal, 10)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.white.opacity(0.05))
+                .fill(Color.primary.opacity(0.05))
         )
     }
 
@@ -159,7 +159,7 @@ extension ContentView {
                 .foregroundStyle(.tertiary)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(Capsule().fill(Color.white.opacity(0.08)))
+                .background(Capsule().fill(Color.primary.opacity(0.08)))
             Text(displayDate(fromISO: item.start_date))
                 .font(.system(.body, design: .rounded).weight(.medium).monospacedDigit())
             Image(systemName: "arrow.left.and.line.vertical.and.arrow.right")
@@ -180,7 +180,7 @@ extension ContentView {
         .padding(.horizontal, 10)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.white.opacity(0.05))
+                .fill(Color.primary.opacity(0.05))
         )
     }
 
@@ -189,7 +189,7 @@ extension ContentView {
             .font(.system(size: 12, weight: .bold, design: .rounded))
             .foregroundStyle(.secondary)
             .frame(width: 28, height: 28)
-            .background(Circle().fill(Color.white.opacity(0.08)))
+            .background(Circle().fill(Color.primary.opacity(0.08)))
     }
 
     private func flowArrowRange() -> some View {
@@ -197,7 +197,7 @@ extension ContentView {
             .font(.system(size: 11, weight: .semibold, design: .rounded))
             .foregroundStyle(.secondary)
             .frame(width: 28, height: 28)
-            .background(Circle().fill(Color.white.opacity(0.08)))
+            .background(Circle().fill(Color.primary.opacity(0.08)))
     }
 
     private func displayDate(fromISO iso: String) -> String {

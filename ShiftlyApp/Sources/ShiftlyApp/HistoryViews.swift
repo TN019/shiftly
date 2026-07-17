@@ -49,7 +49,7 @@ extension ContentView {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(Color.white.opacity(0.06))
+                                    .fill(Color.primary.opacity(0.06))
                             )
                     }
 
@@ -87,7 +87,7 @@ extension ContentView {
                                     .padding(.horizontal, 10)
                                     .background(
                                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .fill(Color.white.opacity(0.05))
+                                            .fill(Color.primary.opacity(0.05))
                                     )
                                 }
                             }
@@ -125,7 +125,7 @@ extension ContentView {
                 .frame(width: 30, height: 26)
                 .background(
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(on ? Color.accentColor.opacity(0.18) : Color.white.opacity(0.05))
+                        .fill(on ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.05))
                 )
         }
         .buttonStyle(.plain)

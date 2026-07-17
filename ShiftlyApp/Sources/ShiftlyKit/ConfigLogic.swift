@@ -41,6 +41,22 @@ public enum ConfigLogic {
         return cfg
     }
 
+    /// Merge calendar identity fields into the raw config dictionary,
+    /// preserving unknown keys (same contract as `mergeSchedule`).
+    public static func mergeCalendarSettings(
+        into raw: [String: Any],
+        calendarName: String,
+        eventTitle: String
+    ) -> [String: Any] {
+        var cfg = raw
+        cfg["calendar_name"] = calendarName
+        cfg["event_title"] = eventTitle
+        if cfg["config_version"] == nil {
+            cfg["config_version"] = 1
+        }
+        return cfg
+    }
+
     public static func readRawConfig(atPath path: String) throws -> [String: Any] {
         let data = try Data(contentsOf: URL(fileURLWithPath: path))
         guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {

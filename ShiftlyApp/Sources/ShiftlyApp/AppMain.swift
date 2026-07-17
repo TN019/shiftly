@@ -29,7 +29,7 @@ struct ShiftlyAppMain: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .preferredColorScheme(.dark)
+                
         }
         .defaultSize(width: 840, height: 780)
     }
