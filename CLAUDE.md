@@ -24,9 +24,11 @@
 
 ## 先读这些
 
-1. [docs/PLAN.md](docs/PLAN.md) —— 总体方案、目标架构、M1–M6 路线图、已知 bug 清单
-2. [docs/SYNC_DESIGN.md](docs/SYNC_DESIGN.md) —— 日历双向同步设计（M2）
-3. [docs/DATA_AND_API.md](docs/DATA_AND_API.md) —— 数据 schema、`shiftly` CLI 与 MCP 设计（M6）
+1. [docs/DATA_AND_API.md](docs/DATA_AND_API.md) —— 数据 schema、CLI 与 MCP 的权威契约
+2. [docs/SYNC_DESIGN.md](docs/SYNC_DESIGN.md) —— 日历双向同步设计
+3. [docs/SETUP.md](docs/SETUP.md) —— 安装/launchd/迁移等技术参考（README 已产品化，
+   分 [README.md](README.md) 英文 / [README.zh-Hans.md](README.zh-Hans.md) 中文）
+4. [docs/PLAN.md](docs/PLAN.md) —— v2 路线图归档
 
 ## 任务管理（mingri）
 
