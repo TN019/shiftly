@@ -40,6 +40,9 @@ struct ContentView: View {
     @State var historyWeekdayFilter: Set<Int> = []
     @State var historyNewestFirst = false
     @State var historyActiveTool: HistoryTool? = nil
+    @State var calMonth: Date = ContentView.startOfMonth(Date())
+    @State var calSelectedDay: SelectedDay? = nil
+    @State var calSwapTarget: Date = Date()
     @AppStorage("shiftly.section") private var storedSection = AppSection.today.rawValue
 
     private var sectionSelection: Binding<AppSection?> {
@@ -205,11 +208,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var calendarPage: some View {
-        placeholderCard(
-            title: "Month View",
-            systemImage: "calendar",
-            text: "The month grid (shifts, swaps, leave at a glance) ships with the next update."
-        )
+        calendarSection
         historySection
     }
 

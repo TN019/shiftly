@@ -29,6 +29,11 @@ final class AppModel: ObservableObject {
     @Published var calendarName = ""
     @Published var eventTitle = ""
     @Published var nextShift: PlannedShift?
+    /// Engine-solved shifts for the month currently shown in the calendar
+    /// page, keyed by YYYY-MM-DD. Same data source as sync (planner +
+    /// overrides + manual), never a re-implementation.
+    @Published var monthShifts: [String: PlannedShift] = [:]
+    private var monthRange: (start: String, end: String)?
 
     @Published private(set) var paths = ShiftlyPaths.shared
     private var store: DataStore { DataStore(paths: paths) }
@@ -68,6 +73,33 @@ final class AppModel: ObservableObject {
         loadSyncReport()
         refreshWorkHistory()
         refreshNextShift()
+        if let range = monthRange {
+            loadMonth(start: range.start, end: range.end)
+        }
+    }
+
+    /// Solve the schedule for a displayed month (start/end YYYY-MM-DD).
+    func loadMonth(start: String, end: String) {
+        monthRange = (start, end)
+        guard paths.isValid else {
+            monthShifts = [:]
+            return
+        }
+        let syncPaths = paths
+        Task { @MainActor in
+            let shifts = await Task.detached(priority: .utility) { () -> [String: PlannedShift] in
+                let source = SyncDataSource(
+                    store: DataStore(paths: syncPaths),
+                    provider: PlannerScriptProvider(root: syncPaths.root)
+                )
+                let list = (try? source.plannedShifts(start: start, end: end)) ?? []
+                return Dictionary(list.map { ($0.date, $0) }, uniquingKeysWith: { a, _ in a })
+            }.value
+            // Only publish if this is still the month being displayed.
+            if monthRange?.start == start {
+                monthShifts = shifts
+            }
+        }
     }
 
     /// Next planned shift from today onward (looks 45 days ahead).
