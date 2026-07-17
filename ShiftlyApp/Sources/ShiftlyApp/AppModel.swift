@@ -39,6 +39,16 @@ final class AppModel: ObservableObject {
     private var monthRange: (start: String, end: String)?
     @Published var payConfig: PayConfig?
     @Published var payCurrentMonth: PayBreakdown?
+    /// Last 12 months (oldest first), empty months included with zero totals.
+    @Published var payMonths: [MonthPay] = []
+    /// Sum of the current calendar year's earnings (base currency).
+    @Published var payYearToDate: Double = 0
+
+    struct MonthPay: Identifiable, Equatable {
+        let month: String // YYYY-MM
+        let breakdown: PayBreakdown
+        var id: String { month }
+    }
 
     @Published private(set) var paths = ShiftlyPaths.shared
     private var store: DataStore { DataStore(paths: paths) }
@@ -88,20 +98,24 @@ final class AppModel: ObservableObject {
 
     // MARK: Pay
 
-    /// Earnings for the current month (same solver as calendar/sync).
+    /// Earnings for the last 12 months in one solve (same source as
+    /// calendar/sync); derives current-month card, chart series, and YTD.
     func refreshPayMonth() {
         guard paths.isValid, let config = payConfig else {
             payCurrentMonth = nil
+            payMonths = []
+            payYearToDate = 0
             return
         }
         let syncPaths = paths
         Task { @MainActor in
-            let breakdown = await Task.detached(priority: .utility) { () -> PayBreakdown in
+            let byMonth = await Task.detached(priority: .utility) { () -> [String: PayBreakdown] in
                 let cal = Calendar.current
                 let now = Date()
-                let monthStart = cal.date(from: cal.dateComponents([.year, .month], from: now)) ?? now
-                let dayCount = cal.range(of: .day, in: .month, for: monthStart)?.count ?? 28
-                let monthEnd = cal.date(byAdding: .day, value: dayCount - 1, to: monthStart) ?? now
+                let thisMonthStart = cal.date(from: cal.dateComponents([.year, .month], from: now)) ?? now
+                let windowStart = cal.date(byAdding: .month, value: -11, to: thisMonthStart) ?? now
+                let dayCount = cal.range(of: .day, in: .month, for: thisMonthStart)?.count ?? 28
+                let windowEnd = cal.date(byAdding: .day, value: dayCount - 1, to: thisMonthStart) ?? now
                 let df = DateFormatter()
                 df.dateFormat = "yyyy-MM-dd"
                 let source = SyncDataSource(
@@ -109,11 +123,26 @@ final class AppModel: ObservableObject {
                     provider: PlannerScriptProvider(root: syncPaths.root)
                 )
                 let shifts = (try? source.plannedShifts(
-                    start: df.string(from: monthStart), end: df.string(from: monthEnd)
+                    start: df.string(from: windowStart), end: df.string(from: windowEnd)
                 )) ?? []
-                return PayEngine.breakdown(shifts: shifts, config: config)
+                return PayEngine.byMonth(shifts: shifts, config: config)
             }.value
-            payCurrentMonth = breakdown
+
+            let cal = Calendar.current
+            let now = Date()
+            var months: [MonthPay] = []
+            for offset in stride(from: -11, through: 0, by: 1) {
+                guard let date = cal.date(byAdding: .month, value: offset, to: now) else { continue }
+                let c = cal.dateComponents([.year, .month], from: date)
+                let key = String(format: "%04d-%02d", c.year ?? 0, c.month ?? 0)
+                months.append(MonthPay(month: key, breakdown: byMonth[key] ?? PayBreakdown()))
+            }
+            payMonths = months
+            payCurrentMonth = months.last?.breakdown
+            let yearPrefix = String(format: "%04d-", cal.component(.year, from: now))
+            payYearToDate = months
+                .filter { $0.month.hasPrefix(yearPrefix) }
+                .reduce(0) { $0 + $1.breakdown.totalAmount }
         }
     }
 

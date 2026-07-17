@@ -257,3 +257,11 @@
 "Rate saved." = "费率已保存。";
 "Exchange rates saved." = "汇率已保存。";
 "Pay save failed: %@" = "工资配置保存失败：%@";
+
+/* 工资图表（M4） */
+"Last 12 Months" = "近 12 个月";
+"No earnings in the last 12 months yet." = "近 12 个月暂无收入记录。";
+"Click a bar for the month's shifts. Amounts in %@." = "点击柱形查看该月班次明细。金额单位：%@。";
+"Year to date" = "本年累计";
+"No shifts this month." = "该月没有班次。";
+"no rate" = "无费率";
