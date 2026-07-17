@@ -39,6 +39,8 @@ final class AppModel: ObservableObject {
     private var monthRange: (start: String, end: String)?
     @Published var payConfig: PayConfig?
     @Published var payCurrentMonth: PayBreakdown?
+    @Published var logDir: String = (WorkLogStore.defaultDir as NSString).expandingTildeInPath
+    @Published var logDirExists = false
     /// Last 12 months (oldest first), empty months included with zero totals.
     @Published var payMonths: [MonthPay] = []
     /// Sum of the current calendar year's earnings (base currency).
@@ -94,6 +96,80 @@ final class AppModel: ObservableObject {
         }
         payConfig = store.loadPayConfig()
         refreshPayMonth()
+        refreshLogState()
+    }
+
+    // MARK: Work log
+
+    var logStore: WorkLogStore {
+        WorkLogStore(rootDir: logDir)
+    }
+
+    func refreshLogState() {
+        let configured = (try? store.loadConfig())?.log_dir ?? WorkLogStore.defaultDir
+        logDir = (configured as NSString).expandingTildeInPath
+        logDirExists = logStore.rootExists
+    }
+
+    /// Create the log folder (first use) at the current location.
+    func createLogDir() {
+        do {
+            try FileManager.default.createDirectory(atPath: logDir, withIntermediateDirectories: true)
+            refreshLogState()
+            statusMessage = L("Log folder created.")
+        } catch {
+            statusMessage = LF("Could not create log folder: %@", error.localizedDescription)
+        }
+    }
+
+    /// Point config at a different log folder. Existing files are neither
+    /// moved nor deleted.
+    func adoptLogDir(_ url: URL) {
+        do {
+            try store.saveLogDir(url.path)
+            refreshLogState()
+            statusMessage = L("Log folder updated. Existing logs stay in the old folder.")
+        } catch {
+            statusMessage = LF("Could not save log folder: %@", error.localizedDescription)
+        }
+    }
+
+    /// Ensure today's log exists (frontmatter pre-filled from the plan) and
+    /// return its path; nil on failure.
+    func ensureTodayLog() async -> String? {
+        let today = Self.todayYMD()
+        let syncPaths = paths
+        let dir = logDir
+        return await Task.detached(priority: .utility) { () -> String? in
+            let source = SyncDataSource(
+                store: DataStore(paths: syncPaths),
+                provider: PlannerScriptProvider(root: syncPaths.root)
+            )
+            let planned = (try? source.plannedShifts(start: today, end: today)) ?? []
+            let days = (try? PlannerScriptProvider(root: syncPaths.root)
+                .plannedDays(start: today, end: today)) ?? []
+            let logStore = WorkLogStore(rootDir: dir)
+            return try? logStore.ensureFile(
+                date: today,
+                shift: planned.first,
+                shiftType: planned.first?.kind == .manual ? "manual" : days.first?.shiftType
+            )
+        }.value
+    }
+
+    func openTodayLog() {
+        guard paths.isValid else { return }
+        guard logDirExists else {
+            statusMessage = L("Create the log folder first.")
+            return
+        }
+        Task { @MainActor in
+            if let path = await ensureTodayLog() {
+                NSWorkspace.shared.open(URL(fileURLWithPath: path))
+            } else {
+                statusMessage = L("Could not create today's log.")
+            }
+        }
     }
 
     // MARK: Pay
