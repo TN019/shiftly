@@ -140,7 +140,7 @@ extension ContentView {
                 Text("Range").font(.caption).foregroundStyle(.secondary)
                 Picker("Range", selection: $historyPeriod) {
                     ForEach(HistoryPeriodFilter.allCases) { p in
-                        Text(p.rawValue).tag(p)
+                        Text(L(p.rawValue)).tag(p)
                     }
                 }
                 .labelsHidden()

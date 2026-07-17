@@ -1,0 +1,233 @@
+/* Shiftly 简体中文 — 键为代码中的英文原文（英文即兜底） */
+
+/* 侧边栏 */
+"Today" = "今日";
+"Calendar" = "日历";
+"Pay" = "工资";
+"Log" = "日志";
+"Settings" = "设置";
+"Shiftly" = "Shiftly";
+
+/* 今日页 */
+"Next shift" = "下一班";
+"No upcoming shift in the next 45 days" = "未来 45 天没有排班";
+"In progress" = "进行中";
+"in progress" = "进行中";
+"Last Sync: %@" = "上次同步：%@";
+"Synced" = "已同步";
+"Unsynced" = "未同步";
+"Error" = "出错";
+"%@ – %@" = "%@ – %@";
+
+/* 周排班 */
+"Weekly Schedule" = "每周排班";
+"Rules & Types…" = "规则与班次…";
+"Start" = "开始";
+"End" = "结束";
+"Effective From" = "生效日期";
+"Shift Type" = "班次类型";
+"Default" = "默认";
+"Save" = "保存";
+"Save + Sync" = "保存并同步";
+"Mon" = "一";
+"Tue" = "二";
+"Wed" = "三";
+"Thu" = "四";
+"Fri" = "五";
+"Sat" = "六";
+"Sun" = "日";
+"1 rule · effective from %@" = "1 条规则 · 自 %@ 生效";
+"%lld rules · latest effective from %@" = "%lld 条规则 · 最新自 %@ 生效";
+
+/* 换班/请假 */
+"Overrides" = "换班与请假";
+"Swap" = "换班";
+"Leave" = "请假";
+"Add" = "添加";
+"Current Overrides" = "当前记录";
+"(%lld)" = "(%lld)";
+"None" = "无";
+"Remove swap" = "删除换班";
+"Remove leave" = "删除请假";
+
+/* 同步报告 */
+"Sync Report" = "同步报告";
+"Last sync succeeded" = "上次同步成功";
+"Last sync failed" = "上次同步失败";
+"No sync yet." = "尚未同步。";
+"Changes read back from Calendar" = "从日历回读的变更";
+"Undo" = "撤销";
+"Undone" = "已撤销";
+"Skipped (not managed by Shiftly): %@" = "已跳过（非 Shiftly 管理）：%@";
+"+%lld ~%lld -%lld · %lld read back" = "+%lld ~%lld -%lld · 回读 %lld";
+"%@ moved to %@ (swap)" = "%@ 移到了 %@（换班）";
+"%@ retimed to %@–%@" = "%@ 改时为 %@–%@";
+"%@ removed in Calendar (day off)" = "%@ 在日历中被删除（停班）";
+"%@ added in Calendar %@–%@ (manual shift)" = "%@ 在日历中新建 %@–%@（单次班）";
+
+/* 工作历史 */
+"Work History" = "工作历史";
+"Refresh" = "刷新";
+"Day %lld" = "第 %lld 天";
+"No entries." = "暂无记录。";
+"No matches for current filters." = "没有符合筛选条件的记录。";
+"Range" = "范围";
+"From" = "从";
+"To" = "到";
+"Order" = "排序";
+"Oldest first" = "最早在前";
+"Newest first" = "最新在前";
+"This week" = "本周";
+"This month" = "本月";
+"All time" = "全部";
+"Custom range" = "自定义范围";
+"Search by date (e.g. 2026-04)" = "按日期搜索（如 2026-04）";
+"Time period" = "时间范围";
+"Sort order" = "排序方式";
+"Quick range" = "快捷范围";
+"Search by date" = "按日期搜索";
+"Weekday" = "星期";
+
+/* 月历 */
+"No shift" = "无排班";
+"Shift" = "排班";
+"Shift (swapped)" = "排班（换班）";
+"Shift (manual)" = "排班（单次）";
+"Leave / day off" = "请假 / 停班";
+"%@–%@" = "%@–%@";
+"Swap to" = "换到";
+"Take leave on this day" = "这天请假";
+"Add leave on this day" = "这天添加请假";
+"Covered by a leave range — manage it under Today → Overrides." = "该日在请假区间内——请到「今日 → 换班与请假」管理。";
+"Write log entry" = "写日志";
+"Work logs arrive in milestone M5" = "工作日志将在里程碑 M5 上线";
+
+/* 规则与班次管理 */
+"Rules & Shift Types" = "规则与班次类型";
+"Done" = "完成";
+"Rule timeline" = "规则时间线";
+"The rule with the latest effective date on or before a day decides that day's schedule. Past rules are history — they keep old work records correct and cannot be edited." = "某一天的排班由生效日期不晚于当天的最新规则决定。已生效的规则是历史——它们保证过去的工作记录准确，不可编辑。";
+"No rules yet." = "还没有规则。";
+"default times" = "默认时间";
+"%@ (missing type)" = "%@（类型缺失）";
+"Active" = "生效中";
+"Scheduled" = "待生效";
+"History" = "历史";
+"Delete this scheduled change" = "删除这条待生效变更";
+"Schedule a change" = "预约变更";
+"Shift type" = "班次类型";
+"Default times" = "默认时间";
+"%@ (%@–%@)" = "%@（%@–%@）";
+"Add rule" = "添加规则";
+"Shift types" = "班次类型";
+"Each type has its own times; end at or before start rolls into the next day (overnight). Rules pick a type, or use the default times." = "每种班次有自己的起止时间；结束不晚于开始则跨入次日（夜班）。规则可指定类型，或使用默认时间。";
+"Label" = "名称";
+"1 rule" = "1 条规则";
+"%lld rules" = "%lld 条规则";
+"Changing or removing this type affects %lld rule(s)" = "修改或删除该类型会影响 %lld 条规则";
+"Unused" = "未被使用";
+"Add type" = "添加类型";
+"Save types" = "保存类型";
+"Ids must be unique and times HH:MM." = "id 必须唯一，时间格式为 HH:MM。";
+"New Type" = "新类型";
+"%@ %@–%@" = "%@ %@–%@";
+
+/* 操作区 */
+"Sync Now" = "立即同步";
+"Open Calendar" = "打开日历";
+"Working…" = "处理中…";
+"Syncing with Calendar…" = "正在与日历同步…";
+
+/* 设置 */
+"General" = "通用";
+"Show in menu bar (keeps Shiftly running when the window is closed)" = "在菜单栏显示（关闭窗口后 Shiftly 继续运行）";
+"Notifications" = "通知";
+"Remind before shift" = "班前提醒";
+"Off" = "关闭";
+"15 min" = "15 分钟";
+"30 min" = "30 分钟";
+"1 hour" = "1 小时";
+"2 hours" = "2 小时";
+"Notifications need the bundled Shiftly.app (scripts/build_app.sh); they are unavailable under swift run." = "通知需要打包后的 Shiftly.app（scripts/build_app.sh）；swift run 下不可用。";
+"Reminders re-schedule automatically whenever the plan changes (swaps, leave, calendar readbacks)." = "排班变化（换班、请假、日历回读）后提醒会自动重排。";
+"Sync" = "同步";
+"Auto-sync" = "自动同步";
+"Hourly" = "每小时";
+"Every 6h" = "每 6 小时";
+"Every 12h" = "每 12 小时";
+"Daily" = "每天";
+"Launch at login" = "登录时启动";
+"Auto-sync runs while Shiftly is open; pair it with Launch at login to survive reboots. Headless syncing without the app uses the launchd template (see README)." = "自动同步在 Shiftly 运行期间工作；搭配「登录时启动」可在重启后继续。不开 App 的无人值守同步用 launchd 模板（见 README）。";
+"Calendar name" = "日历名称";
+"Event title" = "事件标题";
+"Renaming the calendar makes the next sync create/claim a calendar with the new name; existing events in the old calendar are not moved." = "更改日历名称后，下次同步会创建/认领新名称的日历；旧日历中的既有事件不会被移动。";
+"Data Folder" = "数据目录";
+"Show in Finder" = "在访达中显示";
+"Change…" = "更换…";
+"Changing the folder does not move existing data. The SHIFTLY_ROOT environment variable overrides this choice when set." = "更换目录不会迁移既有数据。设置了 SHIFTLY_ROOT 环境变量时以其为准。";
+
+/* 首启引导 */
+"Welcome to Shiftly" = "欢迎使用 Shiftly";
+"Choose a folder to hold Shiftly's data (schedule, swaps, leave). A starter config is created if the folder is empty — an existing Shiftly data folder is picked up as is." = "选择一个文件夹存放 Shiftly 的数据（排班、换班、请假）。空文件夹会自动生成初始配置——已有的 Shiftly 数据文件夹会原样接管。";
+"After that: set your weekly schedule, then press Sync Now — macOS will ask for Calendar access on the first sync." = "然后设置每周排班，点击「立即同步」——macOS 会在首次同步时请求日历权限。";
+"Choose Data Folder…" = "选择数据目录…";
+"Use This Folder" = "使用此文件夹";
+"Choose the folder where Shiftly stores its data." = "选择 Shiftly 存放数据的文件夹。";
+
+/* 占位页 */
+"Month View" = "月视图";
+"Pay tracking arrives in milestone M4: hourly rates, overtime and allowances, monthly charts, and payslip export." = "工资功能将在里程碑 M4 上线：时薪、加班与补贴、月度图表、工资单导出。";
+"Work Log" = "工作日志";
+"Markdown work logs arrive in milestone M5: daily notes in a folder of your choice, quick capture, and calendar integration." = "Markdown 工作日志将在里程碑 M5 上线：日志存放在指定目录、快速记录、日历联动。";
+
+/* 菜单栏 */
+"Next shift: %@ – %@" = "下一班：%@ – %@";
+"Data folder not set — open Shiftly" = "尚未设置数据目录——请打开 Shiftly";
+"Synced · %@" = "已同步 · %@";
+"Not synced yet" = "尚未同步";
+"Sync error — see Shiftly for details" = "同步出错——详见 Shiftly";
+"Write Log Entry" = "写日志";
+"Open Shiftly" = "打开 Shiftly";
+"Quit Shiftly" = "退出 Shiftly";
+
+/* 状态消息（AppModel） */
+"Schedule saved." = "排班已保存。";
+"Save failed: %@" = "保存失败：%@";
+"Rule saved." = "规则已保存。";
+"Rule save failed: %@" = "规则保存失败：%@";
+"Rule deleted." = "规则已删除。";
+"Rule delete failed: %@" = "规则删除失败：%@";
+"Rules already in effect are history and cannot be deleted." = "已生效的规则是历史，不能删除。";
+"Shift types saved." = "班次类型已保存。";
+"Shift types save failed: %@" = "班次类型保存失败：%@";
+"Swap added." = "换班已添加。";
+"Add swap failed: %@" = "添加换班失败：%@";
+"Leave added." = "请假已添加。";
+"Add leave failed: %@" = "添加请假失败：%@";
+"Delete swap failed: %@" = "删除换班失败：%@";
+"Delete leave failed: %@" = "删除请假失败：%@";
+"Settings saved." = "设置已保存。";
+"Save settings failed: %@" = "保存设置失败：%@";
+"Cannot sync: repo path not resolved." = "无法同步：未能解析数据目录。";
+"Calendar access denied. Grant access in System Settings → Privacy & Security → Calendars, then sync again." = "日历权限被拒绝。请在 系统设置 → 隐私与安全性 → 日历 中授权后重新同步。";
+"Open Settings" = "打开设置";
+"Sync failed: %@" = "同步失败：%@";
+"Synced. Already up to date." = "已同步，无需变更。";
+"Synced: %@." = "已同步：%@。";
+"%lld created" = "新建 %lld";
+"%lld updated" = "更新 %lld";
+"%lld removed" = "删除 %lld";
+"%lld read back from Calendar" = "从日历回读 %lld";
+"Could not undo: matching record no longer exists." = "无法撤销：对应记录已不存在。";
+"Undo failed: %@" = "撤销失败：%@";
+"Config invalid: calendar_name is empty." = "配置无效：calendar_name 为空。";
+"Config load failed." = "配置加载失败。";
+"Warning: config_version %lld is newer than this app supports." = "警告：config_version %lld 高于本应用支持的版本。";
+"Set SHIFTLY_ROOT (or legacy SHIFTY_ROOT/SHIFTFLOW_ROOT), or run from the repo so data/config.json can be found." = "请设置 SHIFTLY_ROOT（或旧名 SHIFTY_ROOT/SHIFTFLOW_ROOT），或在仓库内运行以便找到 data/config.json。";
+"Data folder ready. Set your weekly schedule, then Sync Now." = "数据目录就绪。请设置每周排班，然后点击「立即同步」。";
+"Could not prepare data folder: %@" = "数据目录准备失败：%@";
+"Launch at login unavailable: %@ (requires the bundled Shiftly.app)" = "「登录时启动」不可用：%@（需要打包后的 Shiftly.app）";
+"work_history.py not found at the data root or in the app bundle." = "数据目录和应用包中都找不到 work_history.py。";
+
+/* 通知 */
+"Upcoming shift" = "即将上班";

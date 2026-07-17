@@ -12,9 +12,11 @@ struct MenuBarContent: View {
         Group {
             if let shift = model.nextShift {
                 Text("Next shift: \(shift.start.formatted(date: .abbreviated, time: .shortened)) – \(shift.end.formatted(date: .omitted, time: .shortened))")
-                Text(shift.start > Date()
-                     ? shift.start.formatted(.relative(presentation: .named))
-                     : "In progress")
+                if shift.start > Date() {
+                    Text(shift.start.formatted(.relative(presentation: .named)))
+                } else {
+                    Text("In progress")
+                }
             } else if model.paths.isValid {
                 Text("No upcoming shift in the next 45 days")
             } else {
@@ -47,9 +49,9 @@ struct MenuBarContent: View {
 
     private var syncStatusLine: String {
         switch model.syncState {
-        case .synced: return "Synced · \(model.lastSyncText)"
-        case .unsynced: return "Not synced yet"
-        case .error: return "Sync error — see Shiftly for details"
+        case .synced: return LF("Synced · %@", model.lastSyncText)
+        case .unsynced: return L("Not synced yet")
+        case .error: return L("Sync error — see Shiftly for details")
         }
     }
 }

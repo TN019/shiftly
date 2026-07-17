@@ -52,21 +52,22 @@ final class AppModel: ObservableObject {
             try ShiftlyPaths.bootstrapDataDirectory(atRoot: root)
             ShiftlyPaths.persistRoot(root)
             paths = ShiftlyPaths(root: root)
-            statusMessage = "Data folder ready. Set your weekly schedule, then Sync Now."
+            statusMessage = L("Data folder ready. Set your weekly schedule, then Sync Now.")
             load()
         } catch {
-            statusMessage = "Could not prepare data folder: \(error.localizedDescription)"
+            statusMessage = LF("Could not prepare data folder: %@", error.localizedDescription)
         }
     }
 
     let dayOrder = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
     let dayLabels: [String: String] = [
-        "MO": "Mon", "TU": "Tue", "WE": "Wed", "TH": "Thu", "FR": "Fri", "SA": "Sat", "SU": "Sun"
+        "MO": L("Mon"), "TU": L("Tue"), "WE": L("Wed"), "TH": L("Thu"),
+        "FR": L("Fri"), "SA": L("Sat"), "SU": L("Sun"),
     ]
 
     func load() {
         guard paths.isValid else {
-            statusMessage = "Set SHIFTLY_ROOT (or legacy SHIFTY_ROOT/SHIFTFLOW_ROOT), or run from the repo so data/config.json can be found."
+            statusMessage = L("Set SHIFTLY_ROOT (or legacy SHIFTY_ROOT/SHIFTFLOW_ROOT), or run from the repo so data/config.json can be found.")
             return
         }
         loadConfig()
@@ -173,9 +174,9 @@ final class AppModel: ObservableObject {
                 eventTitle: eventTitle.trimmingCharacters(in: .whitespaces)
             )
             syncState = .unsynced
-            statusMessage = "Settings saved."
+            statusMessage = L("Settings saved.")
         } catch {
-            statusMessage = "Save settings failed: \(error.localizedDescription)"
+            statusMessage = LF("Save settings failed: %@", error.localizedDescription)
         }
     }
 
@@ -196,11 +197,11 @@ final class AppModel: ObservableObject {
                 // Re-sync writes the restored plan back to the calendar.
                 syncNow()
             } else {
-                statusMessage = "Could not undo: matching record no longer exists."
+                statusMessage = L("Could not undo: matching record no longer exists.")
                 loadSyncReport()
             }
         } catch {
-            statusMessage = "Undo failed: \(error.localizedDescription)"
+            statusMessage = LF("Undo failed: %@", error.localizedDescription)
         }
     }
 
@@ -218,10 +219,10 @@ final class AppModel: ObservableObject {
             rules = updated.sorted { $0.effective_from < $1.effective_from }
             rulesSummary = Self.rulesSummary(from: rules)
             syncState = .unsynced
-            statusMessage = "Schedule saved."
+            statusMessage = L("Schedule saved.")
             refreshNextShift()
         } catch {
-            statusMessage = "Save failed: \(error.localizedDescription)"
+            statusMessage = LF("Save failed: %@", error.localizedDescription)
         }
     }
 
@@ -238,10 +239,10 @@ final class AppModel: ObservableObject {
             rules = updated.sorted { $0.effective_from < $1.effective_from }
             rulesSummary = Self.rulesSummary(from: rules)
             syncState = .unsynced
-            statusMessage = "Rule saved."
+            statusMessage = L("Rule saved.")
             refreshNextShift()
         } catch {
-            statusMessage = "Rule save failed: \(error.localizedDescription)"
+            statusMessage = LF("Rule save failed: %@", error.localizedDescription)
         }
     }
 
@@ -249,7 +250,7 @@ final class AppModel: ObservableObject {
     /// and stay read-only.
     func deleteRule(effectiveFrom: String) {
         guard effectiveFrom > Self.todayYMD() else {
-            statusMessage = "Rules already in effect are history and cannot be deleted."
+            statusMessage = L("Rules already in effect are history and cannot be deleted.")
             return
         }
         do {
@@ -257,10 +258,10 @@ final class AppModel: ObservableObject {
             rules = updated.sorted { $0.effective_from < $1.effective_from }
             rulesSummary = Self.rulesSummary(from: rules)
             syncState = .unsynced
-            statusMessage = "Rule deleted."
+            statusMessage = L("Rule deleted.")
             refreshNextShift()
         } catch {
-            statusMessage = "Rule delete failed: \(error.localizedDescription)"
+            statusMessage = LF("Rule delete failed: %@", error.localizedDescription)
         }
     }
 
@@ -277,10 +278,10 @@ final class AppModel: ObservableObject {
                 selectedShiftType = nil
             }
             syncState = .unsynced
-            statusMessage = "Shift types saved."
+            statusMessage = L("Shift types saved.")
             refreshNextShift()
         } catch {
-            statusMessage = "Shift types save failed: \(error.localizedDescription)"
+            statusMessage = LF("Shift types save failed: %@", error.localizedDescription)
         }
     }
 
@@ -299,9 +300,9 @@ final class AppModel: ObservableObject {
             try store.saveSwaps(list)
             swaps = list
             syncState = .unsynced
-            statusMessage = "Swap added."
+            statusMessage = L("Swap added.")
         } catch {
-            statusMessage = "Add swap failed: \(error.localizedDescription)"
+            statusMessage = LF("Add swap failed: %@", error.localizedDescription)
         }
     }
 
@@ -314,9 +315,9 @@ final class AppModel: ObservableObject {
             try store.saveLeaves(list)
             leaves = list
             syncState = .unsynced
-            statusMessage = "Leave added."
+            statusMessage = L("Leave added.")
         } catch {
-            statusMessage = "Add leave failed: \(error.localizedDescription)"
+            statusMessage = LF("Add leave failed: %@", error.localizedDescription)
         }
     }
 
@@ -327,7 +328,7 @@ final class AppModel: ObservableObject {
             try store.saveSwaps(swaps)
             syncState = .unsynced
         } catch {
-            statusMessage = "Delete swap failed: \(error.localizedDescription)"
+            statusMessage = LF("Delete swap failed: %@", error.localizedDescription)
         }
     }
 
@@ -338,7 +339,7 @@ final class AppModel: ObservableObject {
             try store.saveLeaves(leaves)
             syncState = .unsynced
         } catch {
-            statusMessage = "Delete leave failed: \(error.localizedDescription)"
+            statusMessage = LF("Delete leave failed: %@", error.localizedDescription)
         }
     }
 
@@ -347,11 +348,11 @@ final class AppModel: ObservableObject {
     func syncNow() {
         guard !isBusy else { return }
         guard paths.isValid else {
-            statusMessage = "Cannot sync: repo path not resolved."
+            statusMessage = L("Cannot sync: repo path not resolved.")
             return
         }
         isBusy = true
-        busyMessage = "Syncing with Calendar…"
+        busyMessage = L("Syncing with Calendar…")
         showSettingsHint = false
         let root = paths.root
         Task { @MainActor in
@@ -362,7 +363,7 @@ final class AppModel: ObservableObject {
             let ekStore = EKEventStore()
             guard await CalendarAccess.request(using: ekStore) else {
                 syncState = .error("calendar access denied")
-                statusMessage = "Calendar access denied. Grant access in System Settings → Privacy & Security → Calendars, then sync again."
+                statusMessage = L("Calendar access denied. Grant access in System Settings → Privacy & Security → Calendars, then sync again.")
                 showSettingsHint = true
                 return
             }
@@ -387,7 +388,7 @@ final class AppModel: ObservableObject {
                 statusMessage = Self.syncSummary(outcome)
             } catch {
                 syncState = .error(String(describing: error))
-                statusMessage = "Sync failed: \(error)"
+                statusMessage = LF("Sync failed: %@", String(describing: error))
                 loadMeta()
             }
         }
@@ -401,12 +402,12 @@ final class AppModel: ObservableObject {
 
     private static func syncSummary(_ outcome: SyncOutcome) -> String {
         var parts: [String] = []
-        if outcome.created > 0 { parts.append("\(outcome.created) created") }
-        if outcome.updated > 0 { parts.append("\(outcome.updated) updated") }
-        if outcome.deleted > 0 { parts.append("\(outcome.deleted) removed") }
-        if !outcome.readbacks.isEmpty { parts.append("\(outcome.readbacks.count) read back from Calendar") }
-        if parts.isEmpty { return "Synced. Already up to date." }
-        return "Synced: " + parts.joined(separator: ", ") + "."
+        if outcome.created > 0 { parts.append(LF("%lld created", outcome.created)) }
+        if outcome.updated > 0 { parts.append(LF("%lld updated", outcome.updated)) }
+        if outcome.deleted > 0 { parts.append(LF("%lld removed", outcome.deleted)) }
+        if !outcome.readbacks.isEmpty { parts.append(LF("%lld read back from Calendar", outcome.readbacks.count)) }
+        if parts.isEmpty { return L("Synced. Already up to date.") }
+        return LF("Synced: %@.", parts.joined(separator: ", "))
     }
 
     func saveScheduleAndSync() {
@@ -440,7 +441,7 @@ final class AppModel: ObservableObject {
         let root = paths.root
         guard let script = ScriptLocator.locate("work_history.py", root: root) else {
             workHistory = []
-            workHistoryNote = "work_history.py not found at the data root or in the app bundle."
+            workHistoryNote = L("work_history.py not found at the data root or in the app bundle.")
             return
         }
         Task { @MainActor in
@@ -456,7 +457,7 @@ final class AppModel: ObservableObject {
         do {
             let config = try store.loadConfig()
             if config.calendar_name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                statusMessage = "Config invalid: calendar_name is empty."
+                statusMessage = L("Config invalid: calendar_name is empty.")
                 return
             }
             startTime = config.default_start_time
@@ -476,10 +477,10 @@ final class AppModel: ObservableObject {
             }
             rulesSummary = Self.rulesSummary(from: sorted)
             if let v = config.config_version, v > 2 {
-                statusMessage = "Warning: config_version \(v) is newer than this app supports."
+                statusMessage = LF("Warning: config_version %lld is newer than this app supports.", v)
             }
         } catch {
-            statusMessage = "Config load failed."
+            statusMessage = L("Config load failed.")
         }
     }
 
@@ -493,9 +494,9 @@ final class AppModel: ObservableObject {
         let sorted = rules.sorted { $0.effective_from < $1.effective_from }
         guard let latest = sorted.last else { return "" }
         if sorted.count == 1 {
-            return "1 rule · effective from \(latest.effective_from)"
+            return LF("1 rule · effective from %@", latest.effective_from)
         }
-        return "\(sorted.count) rules · latest effective from \(latest.effective_from)"
+        return LF("%lld rules · latest effective from %@", sorted.count, latest.effective_from)
     }
 
     // MARK: Auto-sync (runs while the app is open; pair with launch-at-login
@@ -553,7 +554,7 @@ final class AppModel: ObservableObject {
             launchAtLogin = SMAppService.mainApp.status == .enabled
         } catch {
             launchAtLogin = SMAppService.mainApp.status == .enabled
-            statusMessage = "Launch at login unavailable: \(error.localizedDescription) (requires the bundled Shiftly.app)"
+            statusMessage = LF("Launch at login unavailable: %@ (requires the bundled Shiftly.app)", error.localizedDescription)
         }
     }
 }
