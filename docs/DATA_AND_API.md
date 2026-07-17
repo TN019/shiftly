@@ -22,12 +22,16 @@
 新增/演进：
 
 ```jsonc
-// config.json 演进：shift_types 取代单一默认时间（向后兼容读 v1）
+// config.json v2（已实现）：shift_types 叠加在默认时间之上（v1 依旧可读）
+// 时间优先级：单日 override > 规则的 shift_type 时间 > default_start/end_time
+"config_version": 2,
 "shift_types": [
   { "id": "day",   "label": "白班", "start": "10:00", "end": "18:30" },
-  { "id": "night", "label": "夜班", "start": "22:00", "end": "06:00" }  // 跨午夜
+  { "id": "night", "label": "夜班", "start": "22:00", "end": "06:00" }  // 跨午夜（end ≤ start 进次日）
 ],
 "rules": [ { "effective_from": "...", "workdays": [...], "shift_type": "day" } ]
+// rules[].shift_type 缺省 = 用默认时间；planner.py shifts 输出
+// "YYYY-MM-DD|rule或swap|shift_type"，换入日取当日生效规则的类型
 ```
 
 ```jsonc

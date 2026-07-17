@@ -16,7 +16,8 @@ public enum ConfigLogic {
         startTime: String,
         endTime: String,
         effectiveFrom: String,
-        workdays: [String]
+        workdays: [String],
+        shiftType: String? = nil
     ) -> [String: Any] {
         var cfg = raw
         cfg["default_start_time"] = startTime
@@ -30,14 +31,49 @@ public enum ConfigLogic {
         if let i = rules.firstIndex(where: { ($0["effective_from"] as? String) == effectiveFrom }) {
             var rule = rules[i]
             rule["workdays"] = workdays
+            if let shiftType {
+                rule["shift_type"] = shiftType
+            }
             rules[i] = rule
         } else {
-            rules.append(["effective_from": effectiveFrom, "workdays": workdays])
+            var rule: [String: Any] = ["effective_from": effectiveFrom, "workdays": workdays]
+            if let shiftType {
+                rule["shift_type"] = shiftType
+            }
+            rules.append(rule)
         }
         rules.sort {
             (($0["effective_from"] as? String) ?? "") < (($1["effective_from"] as? String) ?? "")
         }
         cfg["rules"] = rules
+        return cfg
+    }
+
+    /// Remove the rule with the given effective_from. Unknown keys elsewhere
+    /// are untouched; removing a nonexistent rule is a no-op.
+    public static func deleteRule(
+        from raw: [String: Any],
+        effectiveFrom: String
+    ) -> [String: Any] {
+        var cfg = raw
+        var rules = (cfg["rules"] as? [[String: Any]]) ?? []
+        rules.removeAll { ($0["effective_from"] as? String) == effectiveFrom }
+        cfg["rules"] = rules
+        return cfg
+    }
+
+    /// Replace the shift-type list. Writing shift types is the v2 feature,
+    /// so config_version is raised to 2 (never lowered).
+    public static func mergeShiftTypes(
+        into raw: [String: Any],
+        shiftTypes: [ShiftType]
+    ) -> [String: Any] {
+        var cfg = raw
+        cfg["shift_types"] = shiftTypes.map { type in
+            ["id": type.id, "label": type.label, "start": type.start, "end": type.end]
+        }
+        let version = cfg["config_version"] as? Int ?? 1
+        cfg["config_version"] = max(version, 2)
         return cfg
     }
 

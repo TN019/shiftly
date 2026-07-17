@@ -29,6 +29,9 @@ final class AppModel: ObservableObject {
     @Published var calendarName = ""
     @Published var eventTitle = ""
     @Published var nextShift: PlannedShift?
+    @Published var rules: [Rule] = []
+    @Published var shiftTypes: [ShiftType] = []
+    @Published var selectedShiftType: String? = nil
     /// Engine-solved shifts for the month currently shown in the calendar
     /// page, keyed by YYYY-MM-DD. Same data source as sync (planner +
     /// overrides + manual), never a re-implementation.
@@ -169,18 +172,86 @@ final class AppModel: ObservableObject {
         do {
             let df = DateFormatter()
             df.dateFormat = "yyyy-MM-dd"
-            let rules = try store.saveSchedule(
+            let updated = try store.saveSchedule(
                 startTime: startTime,
                 endTime: endTime,
                 effectiveFrom: df.string(from: effectiveFrom),
-                workdays: dayOrder.filter { selectedDays.contains($0) }
+                workdays: dayOrder.filter { selectedDays.contains($0) },
+                shiftType: selectedShiftType
             )
+            rules = updated.sorted { $0.effective_from < $1.effective_from }
             rulesSummary = Self.rulesSummary(from: rules)
             syncState = .unsynced
             statusMessage = "Schedule saved."
+            refreshNextShift()
         } catch {
             statusMessage = "Save failed: \(error.localizedDescription)"
         }
+    }
+
+    /// Add or replace a rule from the timeline editor.
+    func upsertRule(effectiveFrom: String, workdays: [String], shiftType: String?) {
+        do {
+            let updated = try store.saveSchedule(
+                startTime: startTime,
+                endTime: endTime,
+                effectiveFrom: effectiveFrom,
+                workdays: workdays,
+                shiftType: shiftType
+            )
+            rules = updated.sorted { $0.effective_from < $1.effective_from }
+            rulesSummary = Self.rulesSummary(from: rules)
+            syncState = .unsynced
+            statusMessage = "Rule saved."
+            refreshNextShift()
+        } catch {
+            statusMessage = "Rule save failed: \(error.localizedDescription)"
+        }
+    }
+
+    /// Delete a not-yet-effective rule. Rules already in effect are history
+    /// and stay read-only.
+    func deleteRule(effectiveFrom: String) {
+        guard effectiveFrom > Self.todayYMD() else {
+            statusMessage = "Rules already in effect are history and cannot be deleted."
+            return
+        }
+        do {
+            let updated = try store.deleteRule(effectiveFrom: effectiveFrom)
+            rules = updated.sorted { $0.effective_from < $1.effective_from }
+            rulesSummary = Self.rulesSummary(from: rules)
+            syncState = .unsynced
+            statusMessage = "Rule deleted."
+            refreshNextShift()
+        } catch {
+            statusMessage = "Rule delete failed: \(error.localizedDescription)"
+        }
+    }
+
+    /// How many rules reference a shift type (for the impact hint).
+    func ruleCount(usingShiftType id: String) -> Int {
+        rules.filter { $0.shift_type == id }.count
+    }
+
+    func saveShiftTypes(_ types: [ShiftType]) {
+        do {
+            try store.saveShiftTypes(types)
+            shiftTypes = types
+            if let selected = selectedShiftType, !types.contains(where: { $0.id == selected }) {
+                selectedShiftType = nil
+            }
+            syncState = .unsynced
+            statusMessage = "Shift types saved."
+            refreshNextShift()
+        } catch {
+            statusMessage = "Shift types save failed: \(error.localizedDescription)"
+        }
+    }
+
+    static func todayYMD() -> String {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        return df.string(from: Date())
     }
 
     func addSwap() {
@@ -357,15 +428,18 @@ final class AppModel: ObservableObject {
             calendarName = config.calendar_name
             eventTitle = config.event_title
             let sorted = config.rules.sorted { $0.effective_from < $1.effective_from }
+            rules = sorted
+            shiftTypes = config.shift_types ?? []
             // Edit the newest rule; older ones are history and must be kept.
             if let latest = sorted.last {
                 selectedDays = Set(latest.workdays)
+                selectedShiftType = latest.shift_type
                 let df = DateFormatter()
                 df.dateFormat = "yyyy-MM-dd"
                 effectiveFrom = df.date(from: latest.effective_from) ?? Date()
             }
             rulesSummary = Self.rulesSummary(from: sorted)
-            if let v = config.config_version, v > 1 {
+            if let v = config.config_version, v > 2 {
                 statusMessage = "Warning: config_version \(v) is newer than this app supports."
             }
         } catch {

@@ -6,7 +6,9 @@ parsing and I/O. User input arrives as arguments — never interpolated into
 code — so quotes/semicolons in input cannot execute anything.
 
 Commands:
-  shifts --start YYYY-MM-DD --end YYYY-MM-DD   lines: "YYYY-MM-DD|auto"
+  shifts --start YYYY-MM-DD --end YYYY-MM-DD   lines: "YYYY-MM-DD|rule|day"
+                                               (date|source|shift_type; source
+                                               is rule or swap)
   sync-range                                   two lines: first, last
                                                (mode from SHIFTLY_SYNC_MODE
                                                or legacy names)
@@ -26,7 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from schedule_core import planned_dates, read_json, repo_root, sync_range
+from schedule_core import planned_days_detailed, read_json, repo_root, sync_range
 
 
 def parse_iso(value: str) -> dt.date:
@@ -54,8 +56,8 @@ def append_json_item(path: Path, item: dict) -> None:
 def cmd_shifts(root: Path, args) -> None:
     cfg = read_json(root / "data/config.json", {})
     swaps, leave = load_overrides(root)
-    for d in sorted(planned_dates(cfg, swaps, leave, args.start, args.end)):
-        print(f"{d.isoformat()}|auto")
+    for day in planned_days_detailed(cfg, swaps, leave, args.start, args.end):
+        print(f"{day['date'].isoformat()}|{day['source']}|{day['shift_type']}")
 
 
 def cmd_sync_range(root: Path, _args) -> None:

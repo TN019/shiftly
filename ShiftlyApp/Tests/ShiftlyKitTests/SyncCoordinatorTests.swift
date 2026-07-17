@@ -10,7 +10,7 @@ private struct StubProvider: ScheduleProvider {
     let baseDates: [String]
     let range: (String, String)
 
-    func plannedDates(start: String, end: String) throws -> [String] {
+    func plannedDays(start: String, end: String) throws -> [PlannedDay] {
         var dates = Set(baseDates)
         for swap in (try? store.loadSwaps()) ?? [] {
             dates.remove(swap.from_date)
@@ -22,6 +22,7 @@ private struct StubProvider: ScheduleProvider {
             dates = dates.filter { $0 < leave.start_date || $0 > leave.end_date }
         }
         return dates.filter { $0 >= start && $0 <= end }.sorted()
+            .map { PlannedDay(date: $0, source: "rule", shiftType: "default") }
     }
 
     func syncRange() throws -> (start: String, end: String) {
@@ -164,7 +165,7 @@ private struct TempRoot {
 
     @Test func failureIsRecordedInMeta() throws {
         struct FailingProvider: ScheduleProvider {
-            func plannedDates(start: String, end: String) throws -> [String] {
+            func plannedDays(start: String, end: String) throws -> [PlannedDay] {
                 throw SyncFailure("planner exploded")
             }
             func syncRange() throws -> (start: String, end: String) {

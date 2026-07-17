@@ -1,13 +1,27 @@
 import Foundation
 
-/// Supplies the planned schedule dates and the sync window. The production
+/// One planner-emitted day: date, provenance (rule/swap) and the shift-type
+/// id of the rule in effect that day.
+public struct PlannedDay: Equatable {
+    public let date: String
+    public let source: String
+    public let shiftType: String
+
+    public init(date: String, source: String, shiftType: String) {
+        self.date = date
+        self.source = source
+        self.shiftType = shiftType
+    }
+}
+
+/// Supplies the planned schedule days and the sync window. The production
 /// implementation shells out to scripts/planner.py so the rule/swap/leave
 /// algorithm keeps its single source of truth in schedule_core.py; the Swift
 /// side only overlays the data the Python planner does not know about
 /// (manual shifts and per-day time overrides).
 public protocol ScheduleProvider {
-    /// Planned auto-shift dates (YYYY-MM-DD) in [start, end].
-    func plannedDates(start: String, end: String) throws -> [String]
+    /// Planned auto-shift days in [start, end].
+    func plannedDays(start: String, end: String) throws -> [PlannedDay]
     /// Sync window as (first, last) dates.
     func syncRange() throws -> (start: String, end: String)
 }
@@ -41,10 +55,16 @@ public struct PlannerScriptProvider: ScheduleProvider {
         self.root = root
     }
 
-    public func plannedDates(start: String, end: String) throws -> [String] {
+    public func plannedDays(start: String, end: String) throws -> [PlannedDay] {
         let out = try run(["shifts", "--start", start, "--end", end])
         return out.split(separator: "\n").compactMap { line in
-            line.split(separator: "|").first.map(String.init)
+            let parts = line.split(separator: "|").map(String.init)
+            guard let date = parts.first, !date.isEmpty else { return nil }
+            return PlannedDay(
+                date: date,
+                source: parts.count > 1 ? parts[1] : "rule",
+                shiftType: parts.count > 2 ? parts[2] : "default"
+            )
         }
     }
 
@@ -101,16 +121,18 @@ public struct SyncDataSource {
         )
         var byDate: [String: PlannedShift] = [:]
 
-        for date in try provider.plannedDates(start: start, end: end) {
-            let times = overrides[date]
+        // Time precedence: per-day override > rule's shift type > defaults.
+        for day in try provider.plannedDays(start: start, end: end) {
+            let typeTimes = config.times(forShiftType: day.shiftType)
+            let override = overrides[day.date]
             let shift = ShiftTimeBuilder.makeShift(
-                date: date,
+                date: day.date,
                 kind: .auto,
                 title: config.event_title,
-                startHHMM: times?.start ?? config.default_start_time,
-                endHHMM: times?.end ?? config.default_end_time
+                startHHMM: override?.start ?? typeTimes.start,
+                endHHMM: override?.end ?? typeTimes.end
             )
-            byDate[date] = shift
+            byDate[day.date] = shift
         }
 
         for manual in store.loadManualShifts() where manual.date >= start && manual.date <= end {

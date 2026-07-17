@@ -43,6 +43,7 @@ struct ContentView: View {
     @State var calMonth: Date = ContentView.startOfMonth(Date())
     @State var calSelectedDay: SelectedDay? = nil
     @State var calSwapTarget: Date = Date()
+    @State private var showScheduleManager = false
     @AppStorage("shiftly.section") private var storedSection = AppSection.today.rawValue
 
     private var sectionSelection: Binding<AppSection?> {
@@ -288,10 +289,16 @@ struct ContentView: View {
 
     private var weeklySection: some View {
         card("Weekly Schedule") {
-            if !model.rulesSummary.isEmpty {
-                Text(model.rulesSummary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            HStack {
+                if !model.rulesSummary.isEmpty {
+                    Text(model.rulesSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Button("Rules & Types…") { showScheduleManager = true }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
             }
             HStack {
                 ForEach(model.dayOrder, id: \.self) { code in
@@ -332,6 +339,20 @@ struct ContentView: View {
                     Text("Effective From").font(.caption).foregroundStyle(.secondary)
                     styledDatePicker($model.effectiveFrom)
                 }
+                if !model.shiftTypes.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Shift Type").font(.caption).foregroundStyle(.secondary)
+                        Picker("", selection: $model.selectedShiftType) {
+                            Text("Default").tag(String?.none)
+                            ForEach(model.shiftTypes) { type in
+                                Text(type.label).tag(String?.some(type.id))
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(width: 120)
+                    }
+                }
                 Spacer(minLength: 0)
                     .contentShape(Rectangle())
                     .frame(minHeight: 44)
@@ -351,6 +372,9 @@ struct ContentView: View {
             }
         }
         .environment(\.isEnabled, !model.isBusy)
+        .sheet(isPresented: $showScheduleManager) {
+            ScheduleManagerSheet(model: model)
+        }
     }
 
     private var actions: some View {
