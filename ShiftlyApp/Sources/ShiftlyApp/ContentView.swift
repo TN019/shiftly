@@ -427,6 +427,33 @@ struct ContentView: View {
                 .toggleStyle(.checkbox)
         }
 
+        card("Notifications") {
+            HStack(spacing: 14) {
+                Text("Remind before shift").font(.subheadline)
+                Picker("", selection: $model.reminderMinutes) {
+                    Text("Off").tag(0)
+                    Text("15 min").tag(15)
+                    Text("30 min").tag(30)
+                    Text("1 hour").tag(60)
+                    Text("2 hours").tag(120)
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 110)
+                .disabled(!model.notificationsAvailable)
+                Spacer(minLength: 0)
+            }
+            if !model.notificationsAvailable {
+                Text("Notifications need the bundled Shiftly.app (scripts/build_app.sh); they are unavailable under swift run.")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+            } else {
+                Text("Reminders re-schedule automatically whenever the plan changes (swaps, leave, calendar readbacks).")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+
         card("Sync") {
             HStack(spacing: 14) {
                 Text("Auto-sync").font(.subheadline)

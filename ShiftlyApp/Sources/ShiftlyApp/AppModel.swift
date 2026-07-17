@@ -105,7 +105,8 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Next planned shift from today onward (looks 45 days ahead).
+    /// Next planned shift from today onward (looks 45 days ahead); also
+    /// reschedules pre-shift reminders from the same solve.
     func refreshNextShift() {
         guard paths.isValid else {
             nextShift = nil
@@ -113,7 +114,7 @@ final class AppModel: ObservableObject {
         }
         let syncPaths = paths
         Task { @MainActor in
-            let shift = await Task.detached(priority: .utility) { () -> PlannedShift? in
+            let shifts = await Task.detached(priority: .utility) { () -> [PlannedShift] in
                 let df = DateFormatter()
                 df.dateFormat = "yyyy-MM-dd"
                 let today = df.string(from: Date())
@@ -122,12 +123,47 @@ final class AppModel: ObservableObject {
                     store: DataStore(paths: syncPaths),
                     provider: PlannerScriptProvider(root: syncPaths.root)
                 )
-                let shifts = (try? source.plannedShifts(start: today, end: end)) ?? []
-                let now = Date()
-                return shifts.first { $0.end > now }
+                return (try? source.plannedShifts(start: today, end: end)) ?? []
             }.value
-            nextShift = shift
+            let now = Date()
+            nextShift = shifts.first { $0.end > now }
+            await rescheduleReminders(shifts: shifts)
         }
+    }
+
+    // MARK: Pre-shift reminders
+
+    static let reminderDefaultsKey = "shiftly.reminderMinutes"
+
+    /// Lead time in minutes; 0 = off. Defaults to 60.
+    @Published var reminderMinutes: Int = {
+        UserDefaults.standard.object(forKey: AppModel.reminderDefaultsKey) == nil
+            ? 60
+            : UserDefaults.standard.integer(forKey: AppModel.reminderDefaultsKey)
+    }() {
+        didSet {
+            UserDefaults.standard.set(reminderMinutes, forKey: Self.reminderDefaultsKey)
+            refreshNextShift()
+        }
+    }
+
+    var notificationsAvailable: Bool {
+        NotificationScheduler.isAvailable
+    }
+
+    private func rescheduleReminders(shifts: [PlannedShift]) async {
+        guard NotificationScheduler.isAvailable else { return }
+        guard reminderMinutes > 0 else {
+            await NotificationScheduler.reschedule([])
+            return
+        }
+        guard await NotificationScheduler.ensureAuthorization() else { return }
+        let items = ReminderPlanner.plan(
+            shifts: shifts,
+            leadMinutes: reminderMinutes,
+            now: Date()
+        )
+        await NotificationScheduler.reschedule(items)
     }
 
     func saveCalendarSettings() {
