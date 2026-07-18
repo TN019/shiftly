@@ -2,21 +2,35 @@ import Foundation
 import Testing
 @testable import ShiftlyKit
 
-private func event(_ id: String, _ date: String, _ start: String, _ end: String) -> CalendarEventInfo {
+private func event(_ id: String, _ date: String, _ start: String, _ end: String) -> HistoryImporter.PastEvent {
     let shift = ShiftTimeBuilder.makeShift(
         date: date, kind: .auto, title: "Shift", startHHMM: start, endHHMM: end
     )!
-    return CalendarEventInfo(id: id, title: "Shift", start: shift.start, end: shift.end)
+    return HistoryImporter.PastEvent(id: id, start: shift.start, end: shift.end, isAllDay: false)
+}
+
+private func allDayEvent(_ id: String, _ date: String) -> HistoryImporter.PastEvent {
+    let shift = ShiftTimeBuilder.makeShift(
+        date: date, kind: .auto, title: "Shift", startHHMM: "00:00", endHHMM: "23:59"
+    )!
+    return HistoryImporter.PastEvent(id: id, start: shift.start, end: shift.end, isAllDay: true)
+}
+
+private func map(
+    _ events: [HistoryImporter.PastEvent],
+    before cutoff: String = "2026-07-18"
+) -> (shifts: [ManualShift], mergedDays: Int) {
+    HistoryImporter.shifts(from: events, before: cutoff, defaultStart: "10:00", defaultEnd: "18:30")
 }
 
 @Suite struct HistoryImporterTests {
     @Test func mapsPastEventsWithRealTimesAndSkipsFuture() {
-        let (shifts, merged) = HistoryImporter.shifts(from: [
+        let (shifts, merged) = map([
             event("a", "2026-02-24", "09:30", "17:15"),
             event("b", "2026-03-03", "12:00", "20:00"),
             event("c", "2026-07-18", "10:00", "18:00"), // cutoff day itself
             event("d", "2026-08-01", "10:00", "18:00"), // future
-        ], before: "2026-07-18")
+        ])
         #expect(merged == 0)
         #expect(shifts == [
             ManualShift(date: "2026-02-24", start: "09:30", end: "17:15", source: "import"),
@@ -25,12 +39,43 @@ private func event(_ id: String, _ date: String, _ start: String, _ end: String)
     }
 
     @Test func multipleEventsOnOneDayMergeToSpan() {
-        let (shifts, merged) = HistoryImporter.shifts(from: [
+        let (shifts, merged) = map([
             event("a", "2026-05-10", "09:00", "13:00"),
             event("b", "2026-05-10", "17:00", "21:00"),
-        ], before: "2026-07-18")
+        ])
         #expect(merged == 1)
         #expect(shifts == [ManualShift(date: "2026-05-10", start: "09:00", end: "21:00", source: "import")])
+    }
+
+    @Test func allDayEventsUseConfiguredDefaultTimes() {
+        let (shifts, merged) = map([
+            allDayEvent("a", "2026-04-01"),
+            allDayEvent("b", "2026-04-02"),
+        ])
+        #expect(merged == 0)
+        #expect(shifts == [
+            ManualShift(date: "2026-04-01", start: "10:00", end: "18:30", source: "import"),
+            ManualShift(date: "2026-04-02", start: "10:00", end: "18:30", source: "import"),
+        ])
+    }
+
+    @Test func timedEventWinsOverAllDayOnSameDay() {
+        let (shifts, _) = map([
+            allDayEvent("a", "2026-04-01"),
+            event("b", "2026-04-01", "11:00", "19:00"),
+        ])
+        #expect(shifts == [ManualShift(date: "2026-04-01", start: "11:00", end: "19:00", source: "import")])
+    }
+
+    @Test func recurringOccurrencesShareIdButAllCount() {
+        // Occurrences of a recurring event arrive with the same id and
+        // different starts; each past day must become a shift.
+        let (shifts, _) = map([
+            event("recurring", "2026-06-01", "10:00", "18:30"),
+            event("recurring", "2026-06-08", "10:00", "18:30"),
+            event("recurring", "2026-06-15", "10:00", "18:30"),
+        ])
+        #expect(shifts.map(\.date) == ["2026-06-01", "2026-06-08", "2026-06-15"])
     }
 
     @Test func applyNeverOverwritesExistingDates() throws {

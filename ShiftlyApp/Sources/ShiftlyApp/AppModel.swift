@@ -951,11 +951,19 @@ final class AppModel: ObservableObject {
                 return
             }
             let today = Self.todayYMD()
+            let cfg = try? DataStore(paths: syncPaths).loadConfig()
+            let (defaultStart, defaultEnd) = (
+                cfg?.default_start_time ?? "09:00",
+                cfg?.default_end_time ?? "17:00"
+            )
             let summary: HistoryImporter.Summary? = await Task.detached(priority: .userInitiated) {
                 let events = HistoryImporter.fetchEvents(
                     calendarID: calendarID, in: ekStore, until: Date()
                 )
-                let (shifts, merged) = HistoryImporter.shifts(from: events, before: today)
+                let (shifts, merged) = HistoryImporter.shifts(
+                    from: events, before: today,
+                    defaultStart: defaultStart, defaultEnd: defaultEnd
+                )
                 return try? HistoryImporter.apply(
                     shifts, mergedDays: merged, to: DataStore(paths: syncPaths)
                 )
