@@ -31,27 +31,14 @@ enum ShiftlyEntry {
 struct ShiftlyAppMain: App {
     @NSApplicationDelegateAdaptor(ShiftlyAppDelegate.self) private var appDelegate
     @StateObject private var model = AppModel()
-    @AppStorage(menuBarEnabledKey) private var menuBarEnabled = true
 
     var body: some Scene {
+        // The menu bar item is an AppKit NSStatusItem owned by AppModel —
+        // SwiftUI's MenuBarExtra(isInserted:) spins the scene-update loop
+        // at 100% CPU (see MenuBarController).
         WindowGroup(id: "main") {
             ContentView(model: model)
         }
         .defaultSize(width: 840, height: 780)
-
-        MenuBarExtra(isInserted: $menuBarEnabled) {
-            MenuBarContent(model: model)
-        } label: {
-            Image(systemName: menuBarSymbol)
-        }
-        .menuBarExtraStyle(.menu)
-    }
-
-    private var menuBarSymbol: String {
-        switch model.syncState {
-        case .synced: return "calendar.badge.checkmark"
-        case .unsynced: return "calendar"
-        case .error: return "calendar.badge.exclamationmark"
-        }
     }
 }
