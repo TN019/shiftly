@@ -859,6 +859,25 @@ final class AppModel: ObservableObject {
         autoSyncTimer = timer
     }
 
+    // MARK: Menu bar (AppKit NSStatusItem; see MenuBarController)
+
+    private lazy var menuBar = MenuBarController(model: self)
+
+    var menuBarEnabled: Bool {
+        UserDefaults.standard.bool(forKey: menuBarEnabledKey)
+    }
+
+    /// Apply the stored preference at launch.
+    func applyMenuBarPreference() {
+        menuBar.setEnabled(menuBarEnabled)
+    }
+
+    func setMenuBarEnabled(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: menuBarEnabledKey)
+        menuBar.setEnabled(enabled)
+        objectWillChange.send()
+    }
+
     // MARK: Launch at login (SMAppService; only effective for the bundled
     // Shiftly.app, not `swift run`)
 

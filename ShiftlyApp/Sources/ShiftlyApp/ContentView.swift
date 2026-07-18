@@ -64,7 +64,15 @@ struct ContentView: View {
     private var sectionSelection: Binding<AppSection?> {
         Binding(
             get: { AppSection(rawValue: storedSection) ?? .today },
-            set: { storedSection = ($0 ?? .today).rawValue }
+            set: { newValue in
+                // List rewrites the selection during view updates; writing
+                // the same value back into AppStorage re-invalidates the view
+                // and spins the update loop. Only persist real changes.
+                let raw = (newValue ?? .today).rawValue
+                if raw != storedSection {
+                    storedSection = raw
+                }
+            }
         )
     }
 
@@ -131,6 +139,7 @@ struct ContentView: View {
             .onAppear {
                 model.load()
                 model.startAutoSyncIfEnabled()
+                model.applyMenuBarPreference()
                 DispatchQueue.main.async {
                     resignAllFocus()
                 }
@@ -561,8 +570,8 @@ struct ContentView: View {
 
     private var menuBarBinding: Binding<Bool> {
         Binding(
-            get: { UserDefaults.standard.bool(forKey: menuBarEnabledKey) },
-            set: { UserDefaults.standard.set($0, forKey: menuBarEnabledKey) }
+            get: { model.menuBarEnabled },
+            set: { model.setMenuBarEnabled($0) }
         )
     }
 
