@@ -121,17 +121,26 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            NavigationSplitView {
-                List(AppSection.allCases, selection: sectionSelection) { section in
-                    Label(section.label, systemImage: section.systemImage)
-                        .tag(section)
+            Group {
+                if model.needsRootSetup {
+                    // First run: no sidebar — a single welcome screen until
+                    // a data folder is chosen (sections would all render the
+                    // same card and clicking the sidebar would look broken).
+                    welcomeScreen
+                } else {
+                    NavigationSplitView {
+                        List(AppSection.allCases, selection: sectionSelection) { section in
+                            Label(section.label, systemImage: section.systemImage)
+                                .tag(section)
+                        }
+                        .navigationSplitViewColumnWidth(min: 165, ideal: 185, max: 230)
+                        .listStyle(.sidebar)
+                    } detail: {
+                        detailPage(for: AppSection(rawValue: storedSection) ?? .today)
+                    }
+                    .navigationTitle("Shiftly")
                 }
-                .navigationSplitViewColumnWidth(min: 165, ideal: 185, max: 230)
-                .listStyle(.sidebar)
-            } detail: {
-                detailPage(for: AppSection(rawValue: storedSection) ?? .today)
             }
-            .navigationTitle("Shiftly")
             .frame(minWidth: 860, minHeight: 560)
             .onExitCommand {
                 resignAllFocus()
@@ -180,16 +189,12 @@ struct ContentView: View {
     private func detailPage(for section: AppSection) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                if model.needsRootSetup {
-                    firstRunSection
-                } else {
-                    switch section {
-                    case .today: todayPage
-                    case .calendar: calendarPage
-                    case .pay: payPage
-                    case .log: logPage
-                    case .settings: settingsPage
-                    }
+                switch section {
+                case .today: todayPage
+                case .calendar: calendarPage
+                case .pay: payPage
+                case .log: logPage
+                case .settings: settingsPage
                 }
                 if !model.statusMessage.isEmpty {
                     HStack(spacing: 10) {
@@ -545,8 +550,34 @@ struct ContentView: View {
         }
     }
 
+    private var welcomeScreen: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                Image(systemName: "calendar.badge.checkmark")
+                    .font(.system(size: 56, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.top, 60)
+                Text("Welcome to Shiftly")
+                    .font(.title.weight(.bold))
+                Text("Shifts, pay and work logs — living right inside Apple Calendar.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                firstRunSection
+                    .frame(maxWidth: 560)
+                if !model.statusMessage.isEmpty {
+                    Text(model.statusMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(24)
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
     private var firstRunSection: some View {
-        card("Welcome to Shiftly") {
+        card("") {
             Text("Choose a folder to hold Shiftly's data (schedule, swaps, leave). A starter config is created if the folder is empty — an existing Shiftly data folder is picked up as is.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
