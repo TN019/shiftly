@@ -19,6 +19,7 @@ public struct ShiftlyPaths {
     public var configPath: String { "\(root)/data/config.json" }
     public var swapsPath: String { "\(root)/data/swaps.json" }
     public var leavePath: String { "\(root)/data/leave.json" }
+    public var holidaysPath: String { "\(root)/data/holidays.json" }
     public var metaPath: String { "\(root)/data/meta.json" }
     public var workHistoryScript: String { "\(root)/scripts/work_history.py" }
 

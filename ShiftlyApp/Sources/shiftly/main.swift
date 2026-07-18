@@ -102,7 +102,7 @@ func logStore() -> WorkLogStore {
 
 let arguments = Array(CommandLine.arguments.dropFirst()).filter { $0 != "--json" }
 guard let command = arguments.first else {
-    fail("usage: shiftly <schedule|swap|leave|shifts|pay|log|report|routine|sync> …", code: 2)
+    fail("usage: shiftly <schedule|swap|leave|holiday|shifts|pay|log|report|routine|sync> …", code: 2)
 }
 let sub = arguments.count > 1 && !arguments[1].hasPrefix("--") ? arguments[1] : ""
 let args = Args(Array(arguments.dropFirst(sub.isEmpty ? 1 : 2)))
@@ -184,6 +184,31 @@ case ("leave", "remove"):
     leaves.remove(at: index)
     try store.saveLeaves(leaves)
     emit(["leave": leaves.map { ["start_date": $0.start_date, "end_date": $0.end_date] }])
+
+case ("holiday", "add"):
+    let date = args.date("date")
+    var holidays = store.loadHolidays()
+    guard !holidays.contains(where: { $0.date == date }) else {
+        fail("\(date) is already a holiday", code: 2)
+    }
+    holidays.append(HolidayItem(date: date, name: args.value("name") ?? ""))
+    try store.saveHolidays(holidays)
+    emit(["holidays": store.loadHolidays().map { ["date": $0.date, "name": $0.name] }])
+
+case ("holiday", "list"):
+    emit(["holidays": store.loadHolidays().map { ["date": $0.date, "name": $0.name] }])
+
+case ("holiday", "remove"):
+    guard let date = args.positional.first ?? args.value("date") else {
+        fail("usage: shiftly holiday remove <YYYY-MM-DD>", code: 2)
+    }
+    var holidays = store.loadHolidays()
+    guard holidays.contains(where: { $0.date == date }) else {
+        fail("no holiday on \(date)", code: 2)
+    }
+    holidays.removeAll { $0.date == date }
+    try store.saveHolidays(holidays)
+    emit(["holidays": holidays.map { ["date": $0.date, "name": $0.name] }])
 
 case ("shifts", "list"):
     let shifts = try dataSource.plannedShifts(start: args.date("from"), end: args.date("to"))

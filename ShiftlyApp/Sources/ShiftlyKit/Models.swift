@@ -52,6 +52,27 @@ public struct Config: Codable {
     }
 }
 
+public struct HolidayItem: Codable, Identifiable, Equatable {
+    // Stable in-memory identity; not part of the JSON file format.
+    public var id = UUID()
+    public var date: String
+    public var name: String
+
+    private enum CodingKeys: String, CodingKey {
+        case date, name
+    }
+
+    public init(date: String, name: String) {
+        self.date = date
+        self.name = name
+    }
+
+    // id is in-memory identity only; equality is about content.
+    public static func == (lhs: HolidayItem, rhs: HolidayItem) -> Bool {
+        lhs.date == rhs.date && lhs.name == rhs.name
+    }
+}
+
 public struct SwapItem: Codable, Identifiable, Equatable {
     // Stable in-memory identity; not part of the JSON file format.
     public var id = UUID()

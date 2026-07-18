@@ -1,0 +1,133 @@
+import ShiftlyKit
+import SwiftUI
+
+extension ContentView {
+    /// Shift page: public holidays. The engine skips rule days that fall on
+    /// a holiday (an explicit swap onto one still wins).
+    var holidaysSection: some View {
+        card("Holidays") {
+            Text("No shifts are scheduled on holidays. Swapping a shift onto a holiday on purpose still works.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(alignment: .center, spacing: 10) {
+                styledDatePicker($model.holidayDate)
+                TextField("Name (optional)", text: $model.holidayName)
+                    .frame(width: 170)
+                Button {
+                    model.addHolidayAndSync()
+                } label: {
+                    Label("Add", systemImage: "plus.circle.fill")
+                }
+                .labelStyle(.titleAndIcon)
+                .buttonStyle(.bordered)
+                .disabled(model.isBusy)
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 10) {
+                Text("Import from a holidays calendar")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                if model.importCalendars.isEmpty {
+                    Button("Load Calendars…") {
+                        model.loadImportCalendars()
+                    }
+                    .buttonStyle(.bordered)
+                } else {
+                    Picker("", selection: $holidayImportCalendarID) {
+                        Text("Choose a calendar").tag("")
+                        ForEach(model.importCalendars) { calendar in
+                            Text(calendar.title).tag(calendar.id)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: 240)
+                    Button {
+                        model.importHolidays(calendarID: holidayImportCalendarID)
+                    } label: {
+                        HStack(spacing: 6) {
+                            if model.holidayImportRunning {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: "square.and.arrow.down")
+                            }
+                            Text("Import Holidays")
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(holidayImportCalendarID.isEmpty || model.holidayImportRunning)
+                }
+                Spacer(minLength: 0)
+            }
+
+            DisclosureGroup(isExpanded: $holidaysListExpanded) {
+                if upcomingHolidays.isEmpty {
+                    Text("None")
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                        .italic()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 6)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ForEach(upcomingHolidays) { item in
+                                holidayRow(item: item)
+                            }
+                        }
+                        .padding(.vertical, 6)
+                    }
+                    .frame(maxHeight: 240)
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text("Upcoming Holidays")
+                        .font(.subheadline.weight(.medium))
+                    Text("(\(upcomingHolidays.count))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                }
+            }
+            .padding(.top, 4)
+        }
+        .environment(\.isEnabled, !model.isBusy)
+    }
+
+    private var upcomingHolidays: [HolidayItem] {
+        model.holidays.filter { item in
+            guard let day = localDateFromISO(item.date) else { return false }
+            return day >= startOfToday
+        }
+    }
+
+    @ViewBuilder
+    private func holidayRow(item: HolidayItem) -> some View {
+        HStack(spacing: 8) {
+            Text(localDateFromISO(item.date)?.formatted(date: .abbreviated, time: .omitted) ?? item.date)
+                .font(.system(.body, design: .rounded).weight(.medium).monospacedDigit())
+            if !item.name.isEmpty {
+                Text(item.name)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Button(role: .destructive) {
+                model.deleteHoliday(id: item.id)
+            } label: {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.borderless)
+            .help("Remove holiday")
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.primary.opacity(0.05))
+        )
+    }
+}

@@ -28,7 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from schedule_core import planned_days_detailed, read_json, repo_root, sync_range
+from schedule_core import holiday_dates, planned_days_detailed, read_json, repo_root, sync_range
 
 
 def parse_iso(value: str) -> dt.date:
@@ -56,7 +56,8 @@ def append_json_item(path: Path, item: dict) -> None:
 def cmd_shifts(root: Path, args) -> None:
     cfg = read_json(root / "data/config.json", {})
     swaps, leave = load_overrides(root)
-    for day in planned_days_detailed(cfg, swaps, leave, args.start, args.end):
+    holidays = holiday_dates(root)
+    for day in planned_days_detailed(cfg, swaps, leave, args.start, args.end, holidays):
         print(f"{day['date'].isoformat()}|{day['source']}|{day['shift_type']}")
 
 

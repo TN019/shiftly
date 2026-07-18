@@ -13,6 +13,9 @@
 | `add_leave` | 请假（start_date ~ end_date） |
 | `list_overrides` | 全部换班/请假记录（带 index） |
 | `remove_override` | 按 kind + index 删除一条换班/请假 |
+| `list_holidays` | 列出全部公共假期 |
+| `add_holiday` | 新增公共假期（该日不排班） |
+| `remove_holiday` | 删除某天的公共假期 |
 | `pay_report` | 某月工资明细与合计 |
 | `log_append` | 追加带时间戳的工作日志 |
 | `log_read` | 读取某天日志全文 |

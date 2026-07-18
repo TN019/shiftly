@@ -25,12 +25,14 @@ public enum HistoryImporter {
         public let start: Date
         public let end: Date
         public let isAllDay: Bool
+        public let title: String
 
-        public init(id: String, start: Date, end: Date, isAllDay: Bool) {
+        public init(id: String, start: Date, end: Date, isAllDay: Bool, title: String = "") {
             self.id = id
             self.start = start
             self.end = end
             self.isAllDay = isAllDay
+            self.title = title
         }
 
         public var startDay: String { SyncFingerprint.dayString(for: start) }
@@ -105,6 +107,26 @@ public enum HistoryImporter {
         return summary
     }
 
+    /// Map calendar events (e.g. a subscribed public-holidays calendar) to
+    /// holiday entries: one per day, named after the event title. Days
+    /// already present in `existing` are kept as they are.
+    public static func holidays(
+        from events: [PastEvent],
+        existing: [HolidayItem]
+    ) -> (merged: [HolidayItem], added: Int) {
+        let known = Set(existing.map(\.date))
+        var byDate: [String: String] = [:]
+        for event in events {
+            let day = event.startDay
+            guard !known.contains(day), byDate[day] == nil else { continue }
+            byDate[day] = event.title
+        }
+        let added = byDate
+            .sorted { $0.key < $1.key }
+            .map { HolidayItem(date: $0.key, name: $0.value) }
+        return ((existing + added).sorted { $0.date < $1.date }, added.count)
+    }
+
     /// All calendars visible to the event store (for the picker UI).
     public static func calendars(in eventStore: EKEventStore) -> [(id: String, title: String)] {
         eventStore.calendars(for: .event)
@@ -133,7 +155,10 @@ public enum HistoryImporter {
                 guard let id = event.eventIdentifier,
                       let start = event.startDate,
                       let end = event.endDate else { continue }
-                events.append(PastEvent(id: id, start: start, end: end, isAllDay: event.isAllDay))
+                events.append(PastEvent(
+                    id: id, start: start, end: end,
+                    isAllDay: event.isAllDay, title: event.title ?? ""
+                ))
             }
             chunkEnd = chunkStart
         }

@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from report import shift_hours
 from schedule_core import (
     earliest_anchor_date,
+    holiday_dates,
     month_end,
     planned_dates,
     planned_days_detailed,
@@ -287,6 +288,52 @@ class TestManualShiftHistory(unittest.TestCase):
             self.assertIn("2026-03-03", ymds)
             self.assertEqual(rows[0]["ymd"], "2026-02-24", "Day 1 = earliest imported day")
             self.assertEqual(rows[0]["ordinal"], 1)
+
+
+class TestHolidays(unittest.TestCase):
+    # 2026-01-05 is a Monday, 2026-01-06 a Tuesday.
+    def test_holiday_cancels_rule_day(self):
+        start, end = dt.date(2026, 1, 5), dt.date(2026, 1, 6)
+        s = planned_dates(RULE_MO_TU, [], [], start, end, {dt.date(2026, 1, 5)})
+        self.assertEqual(s, {dt.date(2026, 1, 6)})
+
+    def test_swap_onto_holiday_wins(self):
+        swaps = [{"from_date": "2026-01-06", "to_date": "2026-01-05"}]
+        start, end = dt.date(2026, 1, 5), dt.date(2026, 1, 6)
+        s = planned_dates(RULE_MO_TU, swaps, [], start, end, {dt.date(2026, 1, 5)})
+        self.assertEqual(s, {dt.date(2026, 1, 5)}, "explicit swap onto a holiday is honored")
+
+    def test_detailed_passes_holidays_through(self):
+        start, end = dt.date(2026, 1, 5), dt.date(2026, 1, 6)
+        days = planned_days_detailed(RULE_MO_TU, [], [], start, end, {dt.date(2026, 1, 6)})
+        self.assertEqual([d["date"] for d in days], [dt.date(2026, 1, 5)])
+
+    def test_holiday_dates_reads_file_and_skips_bad_rows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data").mkdir()
+            (root / "data/holidays.json").write_text(json.dumps([
+                {"date": "2026-12-25", "name": "Christmas Day"},
+                {"date": "not-a-date", "name": "junk"},
+            ]))
+            self.assertEqual(holiday_dates(root), {dt.date(2026, 12, 25)})
+            self.assertEqual(holiday_dates(root / "missing"), set())
+
+    def test_work_history_excludes_holidays(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data").mkdir()
+            (root / "data/config.json").write_text(json.dumps({
+                "calendar_name": "T", "event_title": "T",
+                "default_start_time": "10:00", "default_end_time": "18:30",
+                "rules": [{"effective_from": "2026-01-01", "workdays": ["MO", "TU"]}],
+            }))
+            (root / "data/holidays.json").write_text(json.dumps([
+                {"date": "2026-01-05", "name": "Holiday"},
+            ]))
+            ymds = [r["ymd"] for r in work_history_payload(root)]
+            self.assertNotIn("2026-01-05", ymds)
+            self.assertIn("2026-01-06", ymds)
 
 
 class TestAnchor(unittest.TestCase):

@@ -64,6 +64,8 @@ struct ContentView: View {
     @State var importCalendarID = ""
     @State var todaySwapTarget = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
     @State private var showResetConfirm = false
+    @State var holidayImportCalendarID = ""
+    @State var holidaysListExpanded = false
     @AppStorage("shiftly.section") private var storedSection = AppSection.today.rawValue
 
     private var sectionSelection: Binding<AppSection?> {
@@ -247,6 +249,7 @@ struct ContentView: View {
     private var shiftPage: some View {
         weeklySection
         overridesSection
+        holidaysSection
     }
 
     @ViewBuilder

@@ -378,3 +378,18 @@
 "This deletes Shiftly's files in the data folder and resets app settings. Apple Calendar events and work logs stay. This cannot be undone." = "将删除数据目录中 Shiftly 的文件并重置应用设置。Apple Calendar 事件与工作日志保留。此操作无法撤销。";
 "All Shiftly data erased. Calendar events and work logs were kept." = "Shiftly 数据已全部清除；日历事件与工作日志已保留。";
 "Reset failed: %@" = "重置失败：%@";
+
+/* Holidays */
+"Holidays" = "公共假期";
+"No shifts are scheduled on holidays. Swapping a shift onto a holiday on purpose still works." = "节假日不排班；明确把班换到节假日的换班仍然生效。";
+"Name (optional)" = "名称（可选）";
+"Import from a holidays calendar" = "从节假日日历导入";
+"Import Holidays" = "导入节假日";
+"Upcoming Holidays" = "即将到来的假期";
+"Remove holiday" = "删除假期";
+"Holiday added." = "假期已添加。";
+"Holiday removed." = "假期已删除。";
+"Holiday save failed: %@" = "假期保存失败：%@";
+"%@ is already a holiday." = "%@ 已是假期。";
+"Imported %lld holidays." = "已导入 %lld 个节假日。";
+"Holiday import failed." = "节假日导入失败。";

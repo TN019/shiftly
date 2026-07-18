@@ -164,6 +164,42 @@ server.registerTool(
 );
 
 server.registerTool(
+  "list_holidays",
+  {
+    description: "列出全部公共假期（节假日不排班；换班明确换到节假日仍生效）",
+    inputSchema: {},
+  },
+  async () => textResult(await cli(["holiday", "list"])),
+);
+
+server.registerTool(
+  "add_holiday",
+  {
+    description: "新增公共假期（该日不排班；写入后需 sync_now 才会更新日历）",
+    inputSchema: {
+      date: DATE,
+      name: z.string().optional().describe("假期名称，可省略"),
+    },
+  },
+  async ({ date, name }) => {
+    const args = ["holiday", "add", "--date", date];
+    if (name) args.push("--name", name);
+    return textResult(await cli(args));
+  },
+);
+
+server.registerTool(
+  "remove_holiday",
+  {
+    description: "删除某天的公共假期（写入后需 sync_now）",
+    inputSchema: {
+      date: DATE,
+    },
+  },
+  async ({ date }) => textResult(await cli(["holiday", "remove", date])),
+);
+
+server.registerTool(
   "pay_report",
   {
     description: "某月工资明细与合计（记账货币计；需先在 App 配置 pay）",

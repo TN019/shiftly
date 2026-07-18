@@ -20,6 +20,10 @@ final class AppModel: ObservableObject {
     @Published var leaveEnd = Date()
     @Published var swaps: [SwapItem] = []
     @Published var leaves: [LeaveItem] = []
+    @Published var holidays: [HolidayItem] = []
+    @Published var holidayDate = Date()
+    @Published var holidayName = ""
+    @Published var holidayImportRunning = false
     @Published var syncState: SyncState = .unsynced
     @Published var lastSyncText = "-"
     @Published var statusMessage = ""
@@ -204,6 +208,7 @@ final class AppModel: ObservableObject {
         loadConfig()
         swaps = (try? store.loadSwaps()) ?? []
         leaves = (try? store.loadLeaves()) ?? []
+        holidays = store.loadHolidays()
         loadMeta()
         loadSyncReport()
         refreshWorkHistory()
@@ -882,6 +887,97 @@ final class AppModel: ObservableObject {
     func addSwapAndSync() {
         addSwap()
         syncNow()
+    }
+
+    // MARK: Holidays
+
+    @discardableResult
+    func addHoliday() -> Bool {
+        noteOwnWrite()
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        let day = df.string(from: holidayDate)
+        guard !holidays.contains(where: { $0.date == day }) else {
+            statusMessage = LF("%@ is already a holiday.", day)
+            return false
+        }
+        do {
+            var list = store.loadHolidays()
+            list.append(HolidayItem(
+                date: day,
+                name: holidayName.trimmingCharacters(in: .whitespacesAndNewlines)
+            ))
+            try store.saveHolidays(list)
+            holidays = store.loadHolidays()
+            holidayName = ""
+            syncState = .unsynced
+            statusMessage = L("Holiday added.")
+            return true
+        } catch {
+            statusMessage = LF("Holiday save failed: %@", error.localizedDescription)
+            return false
+        }
+    }
+
+    func addHolidayAndSync() {
+        if addHoliday() {
+            syncNow()
+        }
+    }
+
+    func deleteHoliday(id: UUID) {
+        guard let item = holidays.first(where: { $0.id == id }) else { return }
+        noteOwnWrite()
+        do {
+            var list = store.loadHolidays()
+            list.removeAll { $0.date == item.date }
+            try store.saveHolidays(list)
+            holidays = store.loadHolidays()
+            syncState = .unsynced
+            statusMessage = L("Holiday removed.")
+        } catch {
+            statusMessage = LF("Holiday save failed: %@", error.localizedDescription)
+        }
+    }
+
+    /// Import every day of a calendar (e.g. a subscribed public-holidays
+    /// calendar) as holidays, a couple of years ahead and the past for
+    /// correct work-history counting. Existing dates are kept.
+    func importHolidays(calendarID: String) {
+        guard !holidayImportRunning, paths.isValid else { return }
+        holidayImportRunning = true
+        noteOwnWrite()
+        let syncPaths = paths
+        let existing = store.loadHolidays()
+        Task { @MainActor in
+            defer { holidayImportRunning = false }
+            let ekStore = EKEventStore()
+            guard await CalendarAccess.request(using: ekStore) else {
+                statusMessage = L("Calendar access denied. Grant access in System Settings → Privacy & Security → Calendars, then sync again.")
+                return
+            }
+            let added: Int? = await Task.detached(priority: .userInitiated) {
+                let until = Calendar.current.date(byAdding: .year, value: 2, to: Date()) ?? Date()
+                let events = HistoryImporter.fetchEvents(
+                    calendarID: calendarID, in: ekStore, until: until
+                )
+                let (merged, added) = HistoryImporter.holidays(from: events, existing: existing)
+                do {
+                    try DataStore(paths: syncPaths).saveHolidays(merged)
+                    return added
+                } catch {
+                    return nil
+                }
+            }.value
+            noteOwnWrite()
+            if let added {
+                load()
+                syncState = .unsynced
+                statusMessage = LF("Imported %lld holidays.", added)
+            } else {
+                statusMessage = L("Holiday import failed.")
+            }
+        }
     }
 
     func addLeaveAndSync() {

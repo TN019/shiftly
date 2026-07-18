@@ -11,6 +11,7 @@ public enum DataReset {
         "config.json",
         "swaps.json",
         "leave.json",
+        "holidays.json",
         "overrides.json",
         "manual_shifts.json",
         "pay.json",

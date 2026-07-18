@@ -28,7 +28,19 @@ def read_json(path: Path, default):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def planned_dates(cfg: dict, swaps: list, leave: list, start: dt.date, end: dt.date) -> set[dt.date]:
+def holiday_dates(root: Path) -> set[dt.date]:
+    """Dates of public holidays (data/holidays.json items {date, name})."""
+    out: set[dt.date] = set()
+    for item in read_json(root / "data/holidays.json", []):
+        try:
+            out.add(dt.date.fromisoformat(item.get("date", "")))
+        except ValueError:
+            continue
+    return out
+
+
+def planned_dates(cfg: dict, swaps: list, leave: list, start: dt.date, end: dt.date,
+                  holidays: set | frozenset = frozenset()) -> set[dt.date]:
     wk = {"MO": 0, "TU": 1, "WE": 2, "TH": 3, "FR": 4, "SA": 5, "SU": 6}
     rules = sorted(cfg.get("rules", []), key=lambda r: r.get("effective_from", ""))
 
@@ -54,6 +66,11 @@ def planned_dates(cfg: dict, swaps: list, leave: list, start: dt.date, end: dt.d
             if d.weekday() in workdays:
                 shifts.add(d)
         d += dt.timedelta(days=1)
+
+    # Public holidays cancel rule days. Applied before swaps so an explicit
+    # swap onto a holiday still wins (leave, applied last, removes anything).
+    for h in holidays:
+        shifts.discard(h)
 
     for s in swaps:
         fd = s.get("from_date")
@@ -90,7 +107,8 @@ def planned_dates(cfg: dict, swaps: list, leave: list, start: dt.date, end: dt.d
     return shifts
 
 
-def planned_days_detailed(cfg: dict, swaps: list, leave: list, start: dt.date, end: dt.date) -> list[dict]:
+def planned_days_detailed(cfg: dict, swaps: list, leave: list, start: dt.date, end: dt.date,
+                          holidays: set | frozenset = frozenset()) -> list[dict]:
     """Like planned_dates, but with per-day provenance and shift type:
     [{"date": date, "source": "rule"|"swap", "shift_type": str}, ...] sorted.
 
@@ -117,7 +135,7 @@ def planned_days_detailed(cfg: dict, swaps: list, leave: list, start: dt.date, e
         r = rule_for(day)
         return (r or {}).get("shift_type") or "default"
 
-    dates = planned_dates(cfg, swaps, leave, start, end)
+    dates = planned_dates(cfg, swaps, leave, start, end, holidays)
     swap_targets = set()
     for s in swaps:
         td = s.get("to_date")
@@ -256,7 +274,7 @@ def work_history_payload(root: Path | None = None) -> list[dict]:
         start = min(start, min(manual))
     if start > today:
         start = today
-    planned = planned_dates(cfg, swaps, leave, start, today)
+    planned = planned_dates(cfg, swaps, leave, start, today, holiday_dates(root))
     hist = all_history_dates(history_path)
     combined = sorted(d for d in (planned | hist | manual) if d <= today)
     return [{"ymd": d.isoformat(), "ordinal": n} for n, d in enumerate(combined, start=1)]

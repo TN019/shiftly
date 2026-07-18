@@ -25,6 +25,16 @@ public struct DataStore {
         return try JSONDecoder().decode([LeaveItem].self, from: data)
     }
 
+    /// Missing file = no holidays; the file appears on first save.
+    public func loadHolidays() -> [HolidayItem] {
+        guard let data = FileManager.default.contents(atPath: paths.holidaysPath) else { return [] }
+        return (try? JSONDecoder().decode([HolidayItem].self, from: data)) ?? []
+    }
+
+    public func saveHolidays(_ holidays: [HolidayItem]) throws {
+        try writeJSON(holidays.sorted { $0.date < $1.date }, to: paths.holidaysPath)
+    }
+
     public func loadMeta() -> Meta? {
         guard let data = FileManager.default.contents(atPath: paths.metaPath) else { return nil }
         return try? JSONDecoder().decode(Meta.self, from: data)
