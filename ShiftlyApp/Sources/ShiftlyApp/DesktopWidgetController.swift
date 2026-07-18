@@ -25,7 +25,7 @@ final class DesktopWidgetController {
     private func install() {
         guard panel == nil else { return }
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 264, height: 168),
+            contentRect: NSRect(x: 0, y: 0, width: 176, height: 176),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -42,6 +42,9 @@ final class DesktopWidgetController {
         panel.contentView = NSHostingView(rootView: DesktopWidgetView(model: model))
 
         panel.setFrameAutosaveName("shiftly.desktopWidget")
+        // The autosaved frame may carry an older widget size; the card is
+        // fixed-size, so always normalize.
+        panel.setContentSize(NSSize(width: 176, height: 176))
         if panel.frame.origin == .zero, let screen = NSScreen.main {
             // First run: top-right corner with a margin.
             let frame = screen.visibleFrame
@@ -60,39 +63,50 @@ final class DesktopWidgetController {
     }
 }
 
-/// The widget card itself: date, next shift, and the one-click
-/// start-work button.
+/// The widget card itself: date, next shift, and the one-click start-work
+/// button. Sized and styled like a native small desktop widget (square,
+/// large continuous corners, material background, no border).
 struct DesktopWidgetView: View {
     @ObservedObject var model: AppModel
 
+    private var canStart: Bool {
+        !model.routineRunning && !model.enabledRoutineSteps.isEmpty
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                Image(systemName: "calendar.badge.checkmark")
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(Date().formatted(.dateTime.weekday(.abbreviated)))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Color.accentColor)
-                Text("Shiftly")
+                    .textCase(.uppercase)
+                Text(Date().formatted(.dateTime.day()))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
-                Text(Date().formatted(.dateTime.weekday(.abbreviated).month(.defaultDigits).day()))
-                    .font(.caption2)
+                Image(systemName: "calendar.badge.checkmark")
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.tertiary)
             }
 
+            Spacer(minLength: 6)
+
             if let shift = model.nextShift {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text("Next shift")
-                        .font(.caption2)
+                        .font(.caption2.weight(.medium))
                         .foregroundStyle(.secondary)
-                    Text("\(shift.start.formatted(date: .abbreviated, time: .shortened)) – \(shift.end.formatted(date: .omitted, time: .shortened))")
-                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    Text(shift.start.formatted(date: .omitted, time: .shortened))
+                        .font(.system(size: 26, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                         .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                     if shift.start > Date() {
-                        Text(shift.start.formatted(.relative(presentation: .named)))
+                        Text("\(shift.start.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())) · \(shift.start.formatted(.relative(presentation: .named)))")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                     } else {
                         Text("in progress")
                             .font(.caption2)
@@ -103,39 +117,42 @@ struct DesktopWidgetView: View {
                 Text("No upcoming shift in the next 45 days")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                    .lineLimit(3)
             }
 
-            Spacer(minLength: 0)
+            Spacer(minLength: 8)
 
             Button {
                 model.runRoutine()
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     if model.routineRunning {
                         ProgressView()
-                            .controlSize(.small)
+                            .controlSize(.mini)
                     } else {
                         Image(systemName: "play.fill")
+                            .font(.system(size: 9, weight: .bold))
                     }
                     Text("Start Work")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.caption.weight(.semibold))
                 }
+                .foregroundStyle(canStart ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 7)
+                .frame(height: 30)
+                .background(
+                    canStart ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary),
+                    in: Capsule()
+                )
+                .contentShape(Capsule())
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(model.routineRunning || model.enabledRoutineSteps.isEmpty)
+            .buttonStyle(.plain)
+            .disabled(!canStart)
             .help(model.enabledRoutineSteps.isEmpty
                   ? Text("Configure the routine in Shiftly → Settings")
                   : Text(""))
         }
-        .padding(14)
-        .frame(width: 264, height: 168)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.primary.opacity(0.1), lineWidth: 1)
-        )
+        .padding(16)
+        .frame(width: 176, height: 176)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 }
