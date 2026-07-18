@@ -186,29 +186,33 @@ case ("leave", "remove"):
     emit(["leave": leaves.map { ["start_date": $0.start_date, "end_date": $0.end_date] }])
 
 case ("holiday", "add"):
-    let date = args.date("date")
+    var start = args.date("start")
+    var end = args.value("end") != nil ? args.date("end") : start
+    if end < start { swap(&start, &end) }
     var holidays = store.loadHolidays()
-    guard !holidays.contains(where: { $0.date == date }) else {
-        fail("\(date) is already a holiday", code: 2)
+    guard !holidays.contains(where: { $0.start_date == start && $0.end_date == end }) else {
+        fail("holiday \(start)..\(end) already exists", code: 2)
     }
-    holidays.append(HolidayItem(date: date, name: args.value("name") ?? ""))
+    holidays.append(HolidayItem(start_date: start, end_date: end, name: args.value("name") ?? ""))
     try store.saveHolidays(holidays)
-    emit(["holidays": store.loadHolidays().map { ["date": $0.date, "name": $0.name] }])
+    emit(["holidays": store.loadHolidays().map { ["start_date": $0.start_date, "end_date": $0.end_date, "name": $0.name] }])
 
 case ("holiday", "list"):
-    emit(["holidays": store.loadHolidays().map { ["date": $0.date, "name": $0.name] }])
+    emit(["holidays": store.loadHolidays().enumerated().map {
+        ["index": $0.offset, "start_date": $0.element.start_date, "end_date": $0.element.end_date, "name": $0.element.name]
+    }])
 
 case ("holiday", "remove"):
-    guard let date = args.positional.first ?? args.value("date") else {
-        fail("usage: shiftly holiday remove <YYYY-MM-DD>", code: 2)
+    guard let indexText = args.positional.first ?? args.value("index"), let index = Int(indexText) else {
+        fail("usage: shiftly holiday remove <index>", code: 2)
     }
     var holidays = store.loadHolidays()
-    guard holidays.contains(where: { $0.date == date }) else {
-        fail("no holiday on \(date)", code: 2)
+    guard holidays.indices.contains(index) else {
+        fail("index \(index) out of range (0..\(holidays.count - 1))", code: 2)
     }
-    holidays.removeAll { $0.date == date }
+    holidays.remove(at: index)
     try store.saveHolidays(holidays)
-    emit(["holidays": holidays.map { ["date": $0.date, "name": $0.name] }])
+    emit(["holidays": holidays.map { ["start_date": $0.start_date, "end_date": $0.end_date, "name": $0.name] }])
 
 case ("shifts", "list"):
     let shifts = try dataSource.plannedShifts(start: args.date("from"), end: args.date("to"))

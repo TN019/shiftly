@@ -32,7 +32,7 @@ public struct DataStore {
     }
 
     public func saveHolidays(_ holidays: [HolidayItem]) throws {
-        try writeJSON(holidays.sorted { $0.date < $1.date }, to: paths.holidaysPath)
+        try writeJSON(holidays.sorted { $0.start_date < $1.start_date }, to: paths.holidaysPath)
     }
 
     public func loadMeta() -> Meta? {

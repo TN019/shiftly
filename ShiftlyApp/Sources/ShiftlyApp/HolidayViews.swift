@@ -12,9 +12,15 @@ extension ContentView {
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(alignment: .center, spacing: 10) {
-                styledDatePicker($model.holidayDate)
+                styledDatePicker($model.holidayStart)
+                Image(systemName: "arrow.left.and.line.vertical.and.arrow.right")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .background(Circle().fill(Color.primary.opacity(0.08)))
+                styledDatePicker($model.holidayEnd)
                 TextField("Name (optional)", text: $model.holidayName)
-                    .frame(width: 170)
+                    .frame(width: 150)
                 Button {
                     model.addHolidayAndSync()
                 } label: {
@@ -98,15 +104,24 @@ extension ContentView {
 
     private var upcomingHolidays: [HolidayItem] {
         model.holidays.filter { item in
-            guard let day = localDateFromISO(item.date) else { return false }
-            return day >= startOfToday
+            guard let end = localDateFromISO(item.end_date) else { return false }
+            return end >= startOfToday
         }
+    }
+
+    private func holidayRangeText(_ item: HolidayItem) -> String {
+        let start = localDateFromISO(item.start_date)?
+            .formatted(date: .abbreviated, time: .omitted) ?? item.start_date
+        guard item.end_date != item.start_date else { return start }
+        let end = localDateFromISO(item.end_date)?
+            .formatted(date: .abbreviated, time: .omitted) ?? item.end_date
+        return "\(start) – \(end)"
     }
 
     @ViewBuilder
     private func holidayRow(item: HolidayItem) -> some View {
         HStack(spacing: 8) {
-            Text(localDateFromISO(item.date)?.formatted(date: .abbreviated, time: .omitted) ?? item.date)
+            Text(holidayRangeText(item))
                 .font(.system(.body, design: .rounded).weight(.medium).monospacedDigit())
             if !item.name.isEmpty {
                 Text(item.name)

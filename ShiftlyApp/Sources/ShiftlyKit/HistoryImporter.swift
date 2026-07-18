@@ -108,23 +108,28 @@ public enum HistoryImporter {
     }
 
     /// Map calendar events (e.g. a subscribed public-holidays calendar) to
-    /// holiday entries: one per day, named after the event title. Days
-    /// already present in `existing` are kept as they are.
+    /// holiday ranges named after the event title: a multi-day all-day
+    /// event becomes one start…end entry. Ranges starting on a day some
+    /// existing or earlier-mapped entry starts on are skipped.
     public static func holidays(
         from events: [PastEvent],
         existing: [HolidayItem]
     ) -> (merged: [HolidayItem], added: Int) {
-        let known = Set(existing.map(\.date))
-        var byDate: [String: String] = [:]
-        for event in events {
-            let day = event.startDay
-            guard !known.contains(day), byDate[day] == nil else { continue }
-            byDate[day] = event.title
+        var known = Set(existing.map(\.start_date))
+        var added: [HolidayItem] = []
+        for event in events.sorted(by: { $0.start < $1.start }) {
+            let start = event.startDay
+            // All-day events may end at the next midnight (exclusive) or the
+            // last second of the final day; backing up one second lands on
+            // the final day either way. Guard against degenerate ranges.
+            let endDay = SyncFingerprint.dayString(for: event.end.addingTimeInterval(-1))
+            let end = max(start, endDay)
+            guard !known.contains(start) else { continue }
+            known.insert(start)
+            added.append(HolidayItem(start_date: start, end_date: end, name: event.title))
         }
-        let added = byDate
-            .sorted { $0.key < $1.key }
-            .map { HolidayItem(date: $0.key, name: $0.value) }
-        return ((existing + added).sorted { $0.date < $1.date }, added.count)
+        let merged = (existing + added).sorted { $0.start_date < $1.start_date }
+        return (merged, added.count)
     }
 
     /// All calendars visible to the event store (for the picker UI).

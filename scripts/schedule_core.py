@@ -29,13 +29,21 @@ def read_json(path: Path, default):
 
 
 def holiday_dates(root: Path) -> set[dt.date]:
-    """Dates of public holidays (data/holidays.json items {date, name})."""
+    """Dates covered by public holidays (data/holidays.json items
+    {start_date, end_date, name}; both ends inclusive)."""
     out: set[dt.date] = set()
     for item in read_json(root / "data/holidays.json", []):
         try:
-            out.add(dt.date.fromisoformat(item.get("date", "")))
+            a = dt.date.fromisoformat(item.get("start_date", ""))
+            b = dt.date.fromisoformat(item.get("end_date", ""))
         except ValueError:
             continue
+        if b < a:
+            a, b = b, a
+        d = a
+        while d <= b:
+            out.add(d)
+            d += dt.timedelta(days=1)
     return out
 
 

@@ -390,6 +390,6 @@
 "Holiday added." = "假期已添加。";
 "Holiday removed." = "假期已删除。";
 "Holiday save failed: %@" = "假期保存失败：%@";
-"%@ is already a holiday." = "%@ 已是假期。";
+"This holiday range already exists." = "该假期区间已存在。";
 "Imported %lld holidays." = "已导入 %lld 个节假日。";
 "Holiday import failed." = "节假日导入失败。";

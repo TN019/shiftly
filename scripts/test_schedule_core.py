@@ -308,15 +308,19 @@ class TestHolidays(unittest.TestCase):
         days = planned_days_detailed(RULE_MO_TU, [], [], start, end, {dt.date(2026, 1, 6)})
         self.assertEqual([d["date"] for d in days], [dt.date(2026, 1, 5)])
 
-    def test_holiday_dates_reads_file_and_skips_bad_rows(self):
+    def test_holiday_dates_expands_ranges_and_skips_bad_rows(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "data").mkdir()
             (root / "data/holidays.json").write_text(json.dumps([
-                {"date": "2026-12-25", "name": "Christmas Day"},
-                {"date": "not-a-date", "name": "junk"},
+                {"start_date": "2026-12-25", "end_date": "2026-12-26", "name": "Christmas"},
+                {"start_date": "2026-01-28", "end_date": "2026-01-26", "name": "reversed ends"},
+                {"start_date": "not-a-date", "end_date": "2026-01-01", "name": "junk"},
             ]))
-            self.assertEqual(holiday_dates(root), {dt.date(2026, 12, 25)})
+            self.assertEqual(holiday_dates(root), {
+                dt.date(2026, 12, 25), dt.date(2026, 12, 26),
+                dt.date(2026, 1, 26), dt.date(2026, 1, 27), dt.date(2026, 1, 28),
+            })
             self.assertEqual(holiday_dates(root / "missing"), set())
 
     def test_work_history_excludes_holidays(self):
@@ -329,7 +333,7 @@ class TestHolidays(unittest.TestCase):
                 "rules": [{"effective_from": "2026-01-01", "workdays": ["MO", "TU"]}],
             }))
             (root / "data/holidays.json").write_text(json.dumps([
-                {"date": "2026-01-05", "name": "Holiday"},
+                {"start_date": "2026-01-05", "end_date": "2026-01-05", "name": "Holiday"},
             ]))
             ymds = [r["ymd"] for r in work_history_payload(root)]
             self.assertNotIn("2026-01-05", ymds)

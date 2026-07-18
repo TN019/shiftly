@@ -21,7 +21,8 @@ final class AppModel: ObservableObject {
     @Published var swaps: [SwapItem] = []
     @Published var leaves: [LeaveItem] = []
     @Published var holidays: [HolidayItem] = []
-    @Published var holidayDate = Date()
+    @Published var holidayStart = Date()
+    @Published var holidayEnd = Date()
     @Published var holidayName = ""
     @Published var holidayImportRunning = false
     @Published var syncState: SyncState = .unsynced
@@ -896,15 +897,18 @@ final class AppModel: ObservableObject {
         noteOwnWrite()
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd"
-        let day = df.string(from: holidayDate)
-        guard !holidays.contains(where: { $0.date == day }) else {
-            statusMessage = LF("%@ is already a holiday.", day)
+        var start = df.string(from: holidayStart)
+        var end = df.string(from: holidayEnd)
+        if end < start { swap(&start, &end) }
+        guard !holidays.contains(where: { $0.start_date == start && $0.end_date == end }) else {
+            statusMessage = L("This holiday range already exists.")
             return false
         }
         do {
             var list = store.loadHolidays()
             list.append(HolidayItem(
-                date: day,
+                start_date: start,
+                end_date: end,
                 name: holidayName.trimmingCharacters(in: .whitespacesAndNewlines)
             ))
             try store.saveHolidays(list)
@@ -930,7 +934,7 @@ final class AppModel: ObservableObject {
         noteOwnWrite()
         do {
             var list = store.loadHolidays()
-            list.removeAll { $0.date == item.date }
+            list.removeAll { $0 == item }
             try store.saveHolidays(list)
             holidays = store.loadHolidays()
             syncState = .unsynced

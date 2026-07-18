@@ -55,21 +55,24 @@ public struct Config: Codable {
 public struct HolidayItem: Codable, Identifiable, Equatable {
     // Stable in-memory identity; not part of the JSON file format.
     public var id = UUID()
-    public var date: String
+    /// Inclusive range; a single-day holiday has start_date == end_date.
+    public var start_date: String
+    public var end_date: String
     public var name: String
 
     private enum CodingKeys: String, CodingKey {
-        case date, name
+        case start_date, end_date, name
     }
 
-    public init(date: String, name: String) {
-        self.date = date
+    public init(start_date: String, end_date: String, name: String) {
+        self.start_date = start_date
+        self.end_date = end_date
         self.name = name
     }
 
     // id is in-memory identity only; equality is about content.
     public static func == (lhs: HolidayItem, rhs: HolidayItem) -> Bool {
-        lhs.date == rhs.date && lhs.name == rhs.name
+        lhs.start_date == rhs.start_date && lhs.end_date == rhs.end_date && lhs.name == rhs.name
     }
 }
 
