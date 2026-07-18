@@ -28,6 +28,9 @@
 | `data/readback_log.json` | **禁止手改**（引擎私有） | 回读日志（App 内撤销用） |
 | `<log_dir>/YYYY/YYYY-MM-DD.md` | 人 / AI / App | 工作日志（见 §2） |
 
+App 的 Settings → Reset 删除上表 `data/` 下的全部 Shiftly 文件并重置应用偏好；
+`data/` 中的非 Shiftly 文件、工作日志与 Apple Calendar 事件一律保留。
+
 ## 1. 数据文件 Schema
 
 ### 1.1 config.json（config_version 2；v1 无 shift_types/log_dir 亦可读）

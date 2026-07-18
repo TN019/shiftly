@@ -63,6 +63,7 @@ struct ContentView: View {
     @State var logSearchRan = false
     @State var importCalendarID = ""
     @State var todaySwapTarget = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+    @State private var showResetConfirm = false
     @AppStorage("shiftly.section") private var storedSection = AppSection.today.rawValue
 
     private var sectionSelection: Binding<AppSection?> {
@@ -632,6 +633,30 @@ struct ContentView: View {
             Text("New logs go to the new folder; existing files are neither moved nor deleted.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
+        }
+
+        card("Reset") {
+            Text("Erase all Shiftly data — schedule, overrides, imported history, pay, routine and sync state — and start over from the welcome screen. Apple Calendar events and work log files are not touched.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(role: .destructive) {
+                showResetConfirm = true
+            } label: {
+                Text("Reset Shiftly…")
+                    .foregroundStyle(.red)
+            }
+            .buttonStyle(.bordered)
+        }
+        .confirmationDialog(
+            "Erase all Shiftly data?",
+            isPresented: $showResetConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Erase Everything", role: .destructive) { model.resetAllData() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This deletes Shiftly's files in the data folder and resets app settings. Apple Calendar events and work logs stay. This cannot be undone.")
         }
     }
 

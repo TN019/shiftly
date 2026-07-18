@@ -367,3 +367,14 @@
 "No shift scheduled today." = "今天没有排班。";
 "Both write through to Apple Calendar right away. Undo by removing the entry on the Shift page." = "都会立即写入 Apple Calendar；在排班页删除对应条目即可撤销。";
 "Select at least one workday, then save." = "请先选择至少一个工作日再保存。";
+
+/* Reset */
+"Reset" = "重置";
+"Erase all Shiftly data — schedule, overrides, imported history, pay, routine and sync state — and start over from the welcome screen. Apple Calendar events and work log files are not touched." = "清除 Shiftly 的全部数据——排班规则、换班请假、导入历史、工资、上班流程与同步状态——回到首次启动的欢迎屏。不会动 Apple Calendar 里的事件和工作日志文件。";
+"Reset Shiftly…" = "重置 Shiftly…";
+"Erase all Shiftly data?" = "清除 Shiftly 的全部数据？";
+"Erase Everything" = "全部清除";
+"Cancel" = "取消";
+"This deletes Shiftly's files in the data folder and resets app settings. Apple Calendar events and work logs stay. This cannot be undone." = "将删除数据目录中 Shiftly 的文件并重置应用设置。Apple Calendar 事件与工作日志保留。此操作无法撤销。";
+"All Shiftly data erased. Calendar events and work logs were kept." = "Shiftly 数据已全部清除；日历事件与工作日志已保留。";
+"Reset failed: %@" = "重置失败：%@";

@@ -142,6 +142,54 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Factory reset: delete every Shiftly-owned data file, forget all
+    /// shiftly.* preferences and return to the first-run welcome screen.
+    /// Apple Calendar events and work-log files are left untouched.
+    func resetAllData() {
+        guard paths.isValid else { return }
+        watcher?.stop()
+        watcher = nil
+        do {
+            try DataReset.wipeData(atRoot: paths.root)
+        } catch {
+            statusMessage = LF("Reset failed: %@", error.localizedDescription)
+            startWatching()
+            return
+        }
+        let defaults = UserDefaults.standard
+        for key in defaults.dictionaryRepresentation().keys where key.hasPrefix("shiftly.") {
+            defaults.removeObject(forKey: key)
+        }
+        paths = ShiftlyPaths(root: "")
+        applyingConfig = true
+        selectedDays = []
+        startTime = "10:00"
+        endTime = "18:30"
+        effectiveFrom = Date()
+        selectedShiftType = nil
+        applyingConfig = false
+        scheduleEditorDirty = false
+        rules = []
+        rulesSummary = ""
+        shiftTypes = []
+        swaps = []
+        leaves = []
+        monthShifts = [:]
+        nextShift = nil
+        workHistory = []
+        workHistoryNote = ""
+        payConfig = nil
+        payCurrentMonth = nil
+        payMonths = []
+        payYearToDate = 0
+        routine = []
+        lastReport = nil
+        readbackLog = []
+        lastSyncText = "-"
+        syncState = .unsynced
+        statusMessage = L("All Shiftly data erased. Calendar events and work logs were kept.")
+    }
+
     let dayOrder = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
     let dayLabels: [String: String] = [
         "MO": L("Mon"), "TU": L("Tue"), "WE": L("Wed"), "TH": L("Thu"),
