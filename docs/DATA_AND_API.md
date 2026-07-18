@@ -21,6 +21,7 @@
 | `data/overrides.json` | 同步回读（AI 可删条目=撤销） | 单日时间覆盖 |
 | `data/manual_shifts.json` | 同步回读（AI 可删条目=撤销） | 日历里手建的单次班 |
 | `data/pay.json` | 人 / AI / App | 薪资模型 |
+| `data/routine.json` | 人 / AI / App | 一键上班流程步骤 |
 | `data/meta.json` | **只读**（同步引擎写） | 最近同步状态 |
 | `data/sync_state.json` | **禁止手改**（引擎私有） | 事件映射 |
 | `data/last_sync_report.json` | **禁止手改**（引擎私有） | 最近同步报告 |
@@ -181,12 +182,29 @@
 }
 ```
 
-### 1.5 meta.json（只读）
+### 1.5 routine.json（一键上班流程）
+
+```json
+{ "type": "array", "items": { "type": "object",
+  "required": ["kind", "value"],
+  "properties": {
+    "kind":    { "enum": ["app", "url", "path", "command", "sync", "log"] },
+    "value":   { "type": "string" },
+    "args":    { "type": "array", "items": { "type": "string" } },
+    "enabled": { "type": "boolean", "default": true } } } }
+```
+
+语义：按序执行已启用步骤，单步失败不阻断。app = `open -a value`（有 args 时
+`-n … --args …`，如 Ghostty 的 `--working-directory=…`）；url 仅限 http(s)；
+path 打开文件/文件夹（~ 展开）；command 经 `/bin/zsh -lc` 执行（用户自写，
+信任级同 shell 配置）；sync = 一次日历同步；log = 今日日志追加打卡行。
+
+### 1.6 meta.json（只读）
 
 `{ "last_sync_at": ISO8601, "last_sync_status": "success"|"error", "last_sync_error": string? }`
 ——由同步引擎写入，用于判断最近一次同步是否成功。
 
-### 1.6 引擎私有文件（禁止手改）
+### 1.7 引擎私有文件（禁止手改）
 
 - `sync_state.json`：班次 ↔ 日历事件的映射与指纹。手改会导致重复建事件或误删。
   文件损坏/丢失时引擎自动降级重认领。
@@ -231,6 +249,8 @@ tags: []
 | `log show` | `[--date D]` | `{date,content}` |
 | `log path` | `[--date D]` | `{date,path,exists}` |
 | `report hours` | `--period week\|month` | `{period,from,to,shift_count,total_hours,shifts[]}` |
+| `routine show` | — | `{routine[{kind,value,args?,enabled}]}` |
+| `routine run` | — | `{results[{kind,value,success,message?}]}`（sync 步骤提示改用 sync now） |
 | `sync now` | `[--window next_month]` | `{created,updated,deleted,readbacks,converged}`（需已在 App 授权日历） |
 
 示例：
@@ -245,9 +265,9 @@ shiftly-cli sync now
 ## 4. Shiftly MCP server
 
 `packages/mcp-server/`（node + zod，stdio），每个工具 = 一次 CLI 调用；
-工具面共 11 个：get_schedule / set_schedule / list_shifts / add_swap /
+工具面共 13 个：get_schedule / set_schedule / list_shifts / add_swap /
 add_leave / list_overrides / remove_override / pay_report / log_append /
-log_read / sync_now。详见 packages/mcp-server/README.md。
+log_read / routine_show / routine_run / sync_now。详见 packages/mcp-server/README.md。
 
 注册示例（SHIFTLY_ROOT 指数据目录；CLI 路径缺省自动探测，也可用 SHIFTLY_CLI 指定）：
 

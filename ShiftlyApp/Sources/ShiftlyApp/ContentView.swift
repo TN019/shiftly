@@ -140,6 +140,7 @@ struct ContentView: View {
                 model.load()
                 model.startAutoSyncIfEnabled()
                 model.applyMenuBarPreference()
+                model.applyDesktopWidgetPreference()
                 DispatchQueue.main.async {
                     resignAllFocus()
                 }
@@ -225,6 +226,7 @@ struct ContentView: View {
     private var todayPage: some View {
         header
         nextShiftCard
+        routineCard
         weeklySection
         overridesSection
         syncReportSection
@@ -445,7 +447,14 @@ struct ContentView: View {
         card("General") {
             Toggle("Show in menu bar (keeps Shiftly running when the window is closed)", isOn: menuBarBinding)
                 .toggleStyle(.checkbox)
+            Toggle("Show desktop widget (next shift + one-click start work)", isOn: Binding(
+                get: { model.desktopWidgetEnabled },
+                set: { model.setDesktopWidgetEnabled($0) }
+            ))
+            .toggleStyle(.checkbox)
         }
+
+        routineSettingsCard
 
         card("Notifications") {
             HStack(spacing: 14) {

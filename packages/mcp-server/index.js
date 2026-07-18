@@ -206,6 +206,24 @@ server.registerTool(
 );
 
 server.registerTool(
+  "routine_show",
+  {
+    description: "查看一键上班流程的步骤列表（kind/value/args/enabled）",
+    inputSchema: {},
+  },
+  async () => textResult(await cli(["routine", "show"])),
+);
+
+server.registerTool(
+  "routine_run",
+  {
+    description: "执行一键上班流程（打开已勾选的 App/网站/目录/命令；sync 步骤需另行调用 sync_now）",
+    inputSchema: {},
+  },
+  async () => textResult(await cli(["routine", "run"])),
+);
+
+server.registerTool(
   "sync_now",
   {
     description: "执行一次日历双向同步（需已在 Shiftly App 授权日历权限）",
