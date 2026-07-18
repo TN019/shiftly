@@ -59,6 +59,7 @@ struct ContentView: View {
     @State var logSearchFrom = Calendar.current.date(byAdding: .month, value: -3, to: Date()) ?? Date()
     @State var logSearchTo = Date()
     @State var logSearchRan = false
+    @State var importCalendarID = ""
     @AppStorage("shiftly.section") private var storedSection = AppSection.today.rawValue
 
     private var sectionSelection: Binding<AppSection?> {
@@ -531,6 +532,45 @@ struct ContentView: View {
             Text("Changing the folder does not move existing data. The SHIFTLY_ROOT environment variable overrides this choice when set.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
+        }
+
+        card("Import Calendar History") {
+            Text("One-time import: every past event of a calendar you pick becomes a worked shift with its real start and end times — work history and pay are computed from them. Existing days are never overwritten.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                if model.importCalendars.isEmpty {
+                    Button("Load Calendars…") {
+                        model.loadImportCalendars()
+                    }
+                    .buttonStyle(.bordered)
+                } else {
+                    Picker("", selection: $importCalendarID) {
+                        Text("Choose a calendar").tag("")
+                        ForEach(model.importCalendars) { calendar in
+                            Text(calendar.title).tag(calendar.id)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: 260)
+                    Button {
+                        model.importHistory(calendarID: importCalendarID)
+                    } label: {
+                        HStack(spacing: 6) {
+                            if model.importRunning {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: "square.and.arrow.down")
+                            }
+                            Text("Import Past Events")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(importCalendarID.isEmpty || model.importRunning)
+                }
+                Spacer(minLength: 0)
+            }
         }
 
         card("Work Log Folder") {
