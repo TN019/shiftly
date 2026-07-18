@@ -358,3 +358,12 @@
 "%lld already present, kept as they were." = "%lld 天已存在，保持原样。";
 "%lld days had multiple events and were merged into one span." = "%lld 天有多个事件，已合并为一段。";
 "History import failed." = "历史导入失败。";
+
+/* Today / Shift split */
+"Adjust Today" = "今日调整";
+"Take Today Off" = "今天请假";
+"Move today's shift to" = "把今天的班移到";
+"Move" = "移动";
+"No shift scheduled today." = "今天没有排班。";
+"Both write through to Apple Calendar right away. Undo by removing the entry on the Shift page." = "都会立即写入 Apple Calendar；在排班页删除对应条目即可撤销。";
+"Select at least one workday, then save." = "请先选择至少一个工作日再保存。";

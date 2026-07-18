@@ -6,10 +6,14 @@ import ShiftlyKit
 
 @MainActor
 final class AppModel: ObservableObject {
-    @Published var selectedDays: Set<String> = []
-    @Published var startTime = "10:00"
-    @Published var endTime = "18:30"
-    @Published var effectiveFrom = Date()
+    // Schedule editor state (Shift page). The folder watcher reloads config
+    // on any external file event (iCloud roots touch files constantly), and
+    // an unconditional refresh would wipe in-progress edits — so edits mark
+    // the editor dirty and loadConfig refreshes it only while clean.
+    @Published var selectedDays: Set<String> = [] { didSet { markScheduleEdited() } }
+    @Published var startTime = "10:00" { didSet { markScheduleEdited() } }
+    @Published var endTime = "18:30" { didSet { markScheduleEdited() } }
+    @Published var effectiveFrom = Date() { didSet { markScheduleEdited() } }
     @Published var swapFrom = Date()
     @Published var swapTo = Date()
     @Published var leaveStart = Date()
@@ -31,7 +35,13 @@ final class AppModel: ObservableObject {
     @Published var nextShift: PlannedShift?
     @Published var rules: [Rule] = []
     @Published var shiftTypes: [ShiftType] = []
-    @Published var selectedShiftType: String? = nil
+    @Published var selectedShiftType: String? = nil { didSet { markScheduleEdited() } }
+    private var applyingConfig = false
+    private var scheduleEditorDirty = false
+
+    private func markScheduleEdited() {
+        if !applyingConfig { scheduleEditorDirty = true }
+    }
     /// Engine-solved shifts for the month currently shown in the calendar
     /// page, keyed by YYYY-MM-DD. Same data source as sync (planner +
     /// overrides + manual), never a re-implementation.
@@ -576,7 +586,12 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func saveSchedule() {
+    @discardableResult
+    func saveSchedule() -> Bool {
+        guard !selectedDays.isEmpty else {
+            statusMessage = L("Select at least one workday, then save.")
+            return false
+        }
         noteOwnWrite()
         do {
             let df = DateFormatter()
@@ -590,11 +605,15 @@ final class AppModel: ObservableObject {
             )
             rules = updated.sorted { $0.effective_from < $1.effective_from }
             rulesSummary = Self.rulesSummary(from: rules)
+            // Disk now matches the editor; reloads may refresh it again.
+            scheduleEditorDirty = false
             syncState = .unsynced
             statusMessage = L("Schedule saved.")
             refreshNextShift()
+            return true
         } catch {
             statusMessage = LF("Save failed: %@", error.localizedDescription)
+            return false
         }
     }
 
@@ -791,8 +810,25 @@ final class AppModel: ObservableObject {
     }
 
     func saveScheduleAndSync() {
-        saveSchedule()
-        syncNow()
+        if saveSchedule() {
+            syncNow()
+        }
+    }
+
+    // MARK: Today quick adjustments
+
+    /// One-click "not working today": a single-day leave, synced right away.
+    func takeLeaveToday() {
+        leaveStart = Date()
+        leaveEnd = Date()
+        addLeaveAndSync()
+    }
+
+    /// Move today's shift to another day: a swap, synced right away.
+    func swapToday(to target: Date) {
+        swapFrom = Date()
+        swapTo = target
+        addSwapAndSync()
     }
 
     func addSwapAndSync() {
@@ -840,20 +876,25 @@ final class AppModel: ObservableObject {
                 statusMessage = L("Config invalid: calendar_name is empty.")
                 return
             }
-            startTime = config.default_start_time
-            endTime = config.default_end_time
             calendarName = config.calendar_name
             eventTitle = config.event_title
             let sorted = config.rules.sorted { $0.effective_from < $1.effective_from }
             rules = sorted
             shiftTypes = config.shift_types ?? []
-            // Edit the newest rule; older ones are history and must be kept.
-            if let latest = sorted.last {
-                selectedDays = Set(latest.workdays)
-                selectedShiftType = latest.shift_type
-                let df = DateFormatter()
-                df.dateFormat = "yyyy-MM-dd"
-                effectiveFrom = df.date(from: latest.effective_from) ?? Date()
+            // Refresh the editor from disk only while it has no in-progress
+            // edits. Edit the newest rule; older ones are history.
+            if !scheduleEditorDirty {
+                applyingConfig = true
+                startTime = config.default_start_time
+                endTime = config.default_end_time
+                if let latest = sorted.last {
+                    selectedDays = Set(latest.workdays)
+                    selectedShiftType = latest.shift_type
+                    let df = DateFormatter()
+                    df.dateFormat = "yyyy-MM-dd"
+                    effectiveFrom = df.date(from: latest.effective_from) ?? Date()
+                }
+                applyingConfig = false
             }
             rulesSummary = Self.rulesSummary(from: sorted)
             if let v = config.config_version, v > 2 {

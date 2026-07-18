@@ -2,13 +2,14 @@ import ShiftlyKit
 import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable {
-    case today, calendar, pay, log, settings
+    case today, shift, calendar, pay, log, settings
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .today: return "Today"
+        case .shift: return "Shift"
         case .calendar: return "Calendar"
         case .pay: return "Pay"
         case .log: return "Log"
@@ -19,6 +20,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .today: return "sun.max"
+        case .shift: return "calendar.badge.clock"
         case .calendar: return "calendar"
         case .pay: return "dollarsign.circle"
         case .log: return "text.book.closed"
@@ -60,6 +62,7 @@ struct ContentView: View {
     @State var logSearchTo = Date()
     @State var logSearchRan = false
     @State var importCalendarID = ""
+    @State var todaySwapTarget = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
     @AppStorage("shiftly.section") private var storedSection = AppSection.today.rawValue
 
     private var sectionSelection: Binding<AppSection?> {
@@ -131,7 +134,7 @@ struct ContentView: View {
                 } else {
                     NavigationSplitView {
                         List(AppSection.allCases, selection: sectionSelection) { section in
-                            Label(section.label, systemImage: section.systemImage)
+                            Label(L(section.label), systemImage: section.systemImage)
                                 .tag(section)
                         }
                         .navigationSplitViewColumnWidth(min: 165, ideal: 185, max: 230)
@@ -192,6 +195,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 14) {
                 switch section {
                 case .today: todayPage
+                case .shift: shiftPage
                 case .calendar: calendarPage
                 case .pay: payPage
                 case .log: logPage
@@ -233,10 +237,15 @@ struct ContentView: View {
         header
         nextShiftCard
         routineCard
-        weeklySection
-        overridesSection
+        adjustTodayCard
         syncReportSection
         actions
+    }
+
+    @ViewBuilder
+    private var shiftPage: some View {
+        weeklySection
+        overridesSection
     }
 
     @ViewBuilder
@@ -403,6 +412,42 @@ struct ContentView: View {
         .sheet(isPresented: $showScheduleManager) {
             ScheduleManagerSheet(model: model)
         }
+    }
+
+    /// True while today still has a shift on the plan (upcoming later today
+    /// or in progress) — the precondition for "take today off" / "move it".
+    private var todayHasShift: Bool {
+        guard let shift = model.nextShift else { return false }
+        return Calendar.current.isDateInToday(shift.start)
+    }
+
+    private var adjustTodayCard: some View {
+        card("Adjust Today") {
+            if todayHasShift {
+                HStack(spacing: 10) {
+                    Button("Take Today Off") { model.takeLeaveToday() }
+                        .buttonStyle(.bordered)
+                    Divider().frame(height: 22)
+                    Text("Move today's shift to")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    styledDatePicker($todaySwapTarget)
+                    Button("Move") { model.swapToday(to: todaySwapTarget) }
+                        .buttonStyle(.bordered)
+                        .disabled(Calendar.current.isDateInToday(todaySwapTarget)
+                                  || todaySwapTarget < startOfToday)
+                    Spacer(minLength: 0)
+                }
+                Text("Both write through to Apple Calendar right away. Undo by removing the entry on the Shift page.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            } else {
+                Text("No shift scheduled today.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .environment(\.isEnabled, !model.isBusy)
     }
 
     private var actions: some View {
