@@ -316,3 +316,33 @@
 
 /* 文件监听（M6） */
 "Data changed on disk — reloaded." = "磁盘数据有外部变更——已自动刷新。";
+
+/* 一键上班（v0.8） */
+"Work routine" = "上班流程";
+"%lld of %lld steps enabled" = "已启用 %lld / %lld 步";
+"Start Work" = "开始上班";
+"Work Routine" = "上班流程";
+"One click opens your workday: apps, websites, folders, a shell command, a calendar sync, or a log entry. Unchecked steps stay configured but are skipped." = "一键打开你的工作日：应用、网站、文件夹、shell 命令、日历同步或日志打卡。未勾选的步骤保留配置但跳过执行。";
+"Add:" = "添加：";
+"DingTalk" = "钉钉";
+"WeChat" = "微信";
+"Website…" = "网站…";
+"Ghostty @ folder…" = "Ghostty @ 目录…";
+"Log entry" = "日志打卡";
+"App" = "应用";
+"URL" = "网址";
+"Path" = "路径";
+"Command" = "命令";
+"Log" = "日志";
+"Run a calendar sync" = "执行一次日历同步";
+"--args (optional)" = "--args（可选）";
+"Started work" = "开始上班";
+"Starting your work routine…" = "正在启动上班流程…";
+"Work routine finished." = "上班流程执行完毕。";
+"Routine finished with issues: %@" = "流程执行完毕，但有问题：%@";
+"Routine save failed: %@" = "流程保存失败：%@";
+"Show desktop widget (next shift + one-click start work)" = "显示桌面小组件（下一班 + 一键上班）";
+"Next shift" = "下一班";
+"Configure the routine in Shiftly → Settings" = "请在 Shiftly → 设置 里配置流程";
+"Use This Folder" = "使用此文件夹";
+"Choose the working directory Ghostty should open in." = "选择 Ghostty 打开时定位的工作目录。";

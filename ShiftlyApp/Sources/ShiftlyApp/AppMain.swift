@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 let menuBarEnabledKey = "shiftly.menuBarEnabled"
+let desktopWidgetEnabledKey = "shiftly.desktopWidgetEnabled"
 
 final class ShiftlyAppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -23,7 +24,7 @@ enum ShiftlyEntry {
         if CommandLine.arguments.contains("--sync") {
             exit(HeadlessSync.run())
         }
-        UserDefaults.standard.register(defaults: [menuBarEnabledKey: true])
+        UserDefaults.standard.register(defaults: [menuBarEnabledKey: true, desktopWidgetEnabledKey: true])
         ShiftlyAppMain.main()
     }
 }

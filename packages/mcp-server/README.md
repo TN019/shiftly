@@ -16,6 +16,8 @@
 | `pay_report` | 某月工资明细与合计 |
 | `log_append` | 追加带时间戳的工作日志 |
 | `log_read` | 读取某天日志全文 |
+| `routine_show` | 一键上班流程步骤列表 |
+| `routine_run` | 执行一键上班流程（已勾选步骤） |
 | `sync_now` | 日历双向同步（需已在 App 授权） |
 
 写操作只落数据文件；日历更新需 `sync_now` 或在 App 里 Sync。

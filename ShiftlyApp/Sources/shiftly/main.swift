@@ -102,7 +102,7 @@ func logStore() -> WorkLogStore {
 
 let arguments = Array(CommandLine.arguments.dropFirst()).filter { $0 != "--json" }
 guard let command = arguments.first else {
-    fail("usage: shiftly <schedule|swap|leave|shifts|pay|log|report|sync> …", code: 2)
+    fail("usage: shiftly <schedule|swap|leave|shifts|pay|log|report|routine|sync> …", code: 2)
 }
 let sub = arguments.count > 1 && !arguments[1].hasPrefix("--") ? arguments[1] : ""
 let args = Args(Array(arguments.dropFirst(sub.isEmpty ? 1 : 2)))
@@ -283,6 +283,54 @@ case ("report", "hours"):
         "total_hours": (totalHours * 100).rounded() / 100,
         "shifts": shifts.map(shiftJSON),
     ])
+
+case ("routine", "show"):
+    let steps = store.loadRoutine()
+    emit(["routine": steps.map { step -> [String: Any] in
+        var dict: [String: Any] = ["kind": step.kind, "value": step.value, "enabled": step.enabled]
+        if let args = step.args { dict["args"] = args }
+        return dict
+    }])
+
+case ("routine", "run"):
+    let steps = store.loadRoutine().filter(\.enabled)
+    guard !steps.isEmpty else {
+        fail("routine is empty — add steps in the app's Settings or data/routine.json", code: 2)
+    }
+    let runner = RoutineRunner()
+    var results: [[String: Any]] = []
+    for step in steps {
+        switch step.kind {
+        case "log":
+            let date = todayYMD()
+            let planned = (try? dataSource.plannedShifts(start: date, end: date)) ?? []
+            let days = (try? PlannerScriptProvider(root: paths.root).plannedDays(start: date, end: date)) ?? []
+            do {
+                try logStore().append(
+                    entry: step.value.isEmpty ? "Started work" : step.value,
+                    date: date,
+                    timeHHMM: SyncFingerprint.hhmmString(for: Date()),
+                    shift: planned.first,
+                    shiftType: days.first?.shiftType
+                )
+                results.append(["kind": "log", "value": step.value, "success": true])
+            } catch {
+                results.append(["kind": "log", "value": step.value, "success": false,
+                                "message": String(describing: error)])
+            }
+        case "sync":
+            // Calendar sync needs EventKit consent; keep it a separate,
+            // explicit command in CLI context.
+            results.append(["kind": "sync", "value": "", "success": false,
+                            "message": "run `shiftly sync now` separately (needs calendar access)"])
+        default:
+            let result = runner.runStep(step)
+            var dict: [String: Any] = ["kind": step.kind, "value": step.value, "success": result.success]
+            if let message = result.message { dict["message"] = message }
+            results.append(dict)
+        }
+    }
+    emit(["results": results])
 
 case ("sync", "now"):
     if let window = args.value("window") {

@@ -50,6 +50,9 @@ final class AppModel: ObservableObject {
     @Published var payMonths: [MonthPay] = []
     /// Sum of the current calendar year's earnings (base currency).
     @Published var payYearToDate: Double = 0
+    /// Work routine steps (data/routine.json).
+    @Published var routine: [RoutineStep] = []
+    @Published var routineRunning = false
 
     struct MonthPay: Identifiable, Equatable {
         let month: String // YYYY-MM
@@ -145,8 +148,57 @@ final class AppModel: ObservableObject {
         payConfig = store.loadPayConfig()
         refreshPayMonth()
         refreshLogState()
+        routine = store.loadRoutine()
         if watcher == nil {
             startWatching()
+        }
+    }
+
+    // MARK: Work routine
+
+    var enabledRoutineSteps: [RoutineStep] {
+        routine.filter(\.enabled)
+    }
+
+    func updateRoutine(_ steps: [RoutineStep]) {
+        noteOwnWrite()
+        do {
+            try store.saveRoutine(steps)
+            routine = steps
+        } catch {
+            statusMessage = LF("Routine save failed: %@", error.localizedDescription)
+        }
+    }
+
+    /// Run all enabled steps in order. Failing steps are collected and
+    /// reported; they never stop the rest.
+    func runRoutine() {
+        guard !routineRunning else { return }
+        let steps = enabledRoutineSteps
+        guard !steps.isEmpty else { return }
+        routineRunning = true
+        statusMessage = L("Starting your work routine…")
+        Task { @MainActor in
+            var failures: [String] = []
+            for step in steps {
+                switch step.kind {
+                case "sync":
+                    syncNow()
+                case "log":
+                    quickCapture(step.value.isEmpty ? L("Started work") : step.value)
+                default:
+                    let result = await Task.detached(priority: .userInitiated) {
+                        RoutineRunner().runStep(step)
+                    }.value
+                    if !result.success {
+                        failures.append("\(step.value): \(result.message ?? "?")")
+                    }
+                }
+            }
+            routineRunning = false
+            statusMessage = failures.isEmpty
+                ? L("Work routine finished.")
+                : LF("Routine finished with issues: %@", failures.joined(separator: "; "))
         }
     }
 
@@ -862,6 +914,21 @@ final class AppModel: ObservableObject {
     // MARK: Menu bar (AppKit NSStatusItem; see MenuBarController)
 
     private lazy var menuBar = MenuBarController(model: self)
+    private lazy var desktopWidget = DesktopWidgetController(model: self)
+
+    var desktopWidgetEnabled: Bool {
+        UserDefaults.standard.bool(forKey: desktopWidgetEnabledKey)
+    }
+
+    func applyDesktopWidgetPreference() {
+        desktopWidget.setEnabled(desktopWidgetEnabled)
+    }
+
+    func setDesktopWidgetEnabled(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: desktopWidgetEnabledKey)
+        desktopWidget.setEnabled(enabled)
+        objectWillChange.send()
+    }
 
     var menuBarEnabled: Bool {
         UserDefaults.standard.bool(forKey: menuBarEnabledKey)

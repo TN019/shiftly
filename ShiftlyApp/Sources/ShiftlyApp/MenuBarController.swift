@@ -92,6 +92,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         sync.isEnabled = !model.isBusy && model.paths.isValid
         menu.addItem(sync)
 
+        if !model.enabledRoutineSteps.isEmpty {
+            let start = NSMenuItem(title: L("Start Work"), action: #selector(startWork), keyEquivalent: "")
+            start.target = self
+            start.isEnabled = !model.routineRunning
+            menu.addItem(start)
+        }
+
         menu.addItem(disabled(L("Write Log Entry")))
 
         menu.addItem(.separator())
@@ -123,6 +130,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func syncNow() {
         model.syncNow()
+    }
+
+    @objc private func startWork() {
+        model.runRoutine()
     }
 
     @objc private func openApp() {
