@@ -53,6 +53,14 @@ final class AppModel: ObservableObject {
     /// Work routine steps (data/routine.json).
     @Published var routine: [RoutineStep] = []
     @Published var routineRunning = false
+    /// Calendars available for history import (id, title).
+    @Published var importCalendars: [ImportCalendar] = []
+    @Published var importRunning = false
+
+    struct ImportCalendar: Identifiable, Equatable {
+        let id: String
+        let title: String
+    }
 
     struct MonthPay: Identifiable, Equatable {
         let month: String // YYYY-MM
@@ -909,6 +917,64 @@ final class AppModel: ObservableObject {
         timer.tolerance = 300
         RunLoop.main.add(timer, forMode: .common)
         autoSyncTimer = timer
+    }
+
+    // MARK: History import (Apple Calendar → manual_shifts)
+
+    /// Load the calendar list for the import picker (asks for calendar
+    /// access if needed).
+    func loadImportCalendars() {
+        Task { @MainActor in
+            let ekStore = EKEventStore()
+            guard await CalendarAccess.request(using: ekStore) else {
+                statusMessage = L("Calendar access denied. Grant access in System Settings → Privacy & Security → Calendars, then sync again.")
+                showSettingsHint = true
+                return
+            }
+            importCalendars = HistoryImporter.calendars(in: ekStore)
+                .map { ImportCalendar(id: $0.id, title: $0.title) }
+        }
+    }
+
+    /// Import every past event of the chosen calendar as worked shifts
+    /// (real start/end times). Existing dates are never overwritten.
+    func importHistory(calendarID: String) {
+        guard !importRunning, paths.isValid else { return }
+        importRunning = true
+        noteOwnWrite()
+        let syncPaths = paths
+        Task { @MainActor in
+            defer { importRunning = false }
+            let ekStore = EKEventStore()
+            guard await CalendarAccess.request(using: ekStore) else {
+                statusMessage = L("Calendar access denied. Grant access in System Settings → Privacy & Security → Calendars, then sync again.")
+                return
+            }
+            let today = Self.todayYMD()
+            let summary: HistoryImporter.Summary? = await Task.detached(priority: .userInitiated) {
+                let events = HistoryImporter.fetchEvents(
+                    calendarID: calendarID, in: ekStore, until: Date()
+                )
+                let (shifts, merged) = HistoryImporter.shifts(from: events, before: today)
+                return try? HistoryImporter.apply(
+                    shifts, mergedDays: merged, to: DataStore(paths: syncPaths)
+                )
+            }.value
+            noteOwnWrite()
+            if let summary {
+                load()
+                var text = LF("Imported %lld days of history.", summary.imported)
+                if summary.skippedExisting > 0 {
+                    text += " " + LF("%lld already present, kept as they were.", summary.skippedExisting)
+                }
+                if summary.mergedDays > 0 {
+                    text += " " + LF("%lld days had multiple events and were merged into one span.", summary.mergedDays)
+                }
+                statusMessage = text
+            } else {
+                statusMessage = L("History import failed.")
+            }
+        }
     }
 
     // MARK: Menu bar (AppKit NSStatusItem; see MenuBarController)

@@ -346,3 +346,15 @@
 "Configure the routine in Shiftly → Settings" = "请在 Shiftly → 设置 里配置流程";
 "Use This Folder" = "使用此文件夹";
 "Choose the working directory Ghostty should open in." = "选择 Ghostty 打开时定位的工作目录。";
+"Shifts, pay and work logs — living right inside Apple Calendar." = "排班、工资、工作日志——都住进你的 Apple 日历。";
+
+/* 历史导入（v0.8） */
+"Import Calendar History" = "导入日历历史";
+"One-time import: every past event of a calendar you pick becomes a worked shift with its real start and end times — work history and pay are computed from them. Existing days are never overwritten." = "一次性导入：所选日历中今天之前的每个事件，都会按真实起止时间成为一条已上班记录——工作历史和工资据此计算。已有日期不会被覆盖。";
+"Load Calendars…" = "加载日历列表…";
+"Choose a calendar" = "选择日历";
+"Import Past Events" = "导入历史事件";
+"Imported %lld days of history." = "已导入 %lld 天历史。";
+"%lld already present, kept as they were." = "%lld 天已存在，保持原样。";
+"%lld days had multiple events and were merged into one span." = "%lld 天有多个事件，已合并为一段。";
+"History import failed." = "历史导入失败。";

@@ -263,6 +263,32 @@ class TestPlannerCLI(unittest.TestCase):
         self.assertEqual(len(swaps), 1)
 
 
+class TestManualShiftHistory(unittest.TestCase):
+    def test_manual_dates_join_history_and_anchor(self):
+        import tempfile, os as _os
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data").mkdir()
+            (root / "data/config.json").write_text(json.dumps({
+                "config_version": 2, "calendar_name": "S", "event_title": "W",
+                "default_start_time": "10:00", "default_end_time": "18:30",
+                "rules": [{"effective_from": "2026-07-01", "workdays": ["MO"]}],
+            }))
+            (root / "data/swaps.json").write_text("[]")
+            (root / "data/leave.json").write_text("[]")
+            (root / "data/manual_shifts.json").write_text(json.dumps([
+                {"date": "2026-02-24", "start": "09:00", "end": "17:00", "source": "import"},
+                {"date": "2026-03-03", "start": "09:00", "end": "17:00", "source": "import"},
+                {"date": "bad-date", "start": "0:0", "end": "0:0", "source": "import"},
+            ]))
+            rows = work_history_payload(root)
+            ymds = [r["ymd"] for r in rows]
+            self.assertIn("2026-02-24", ymds)
+            self.assertIn("2026-03-03", ymds)
+            self.assertEqual(rows[0]["ymd"], "2026-02-24", "Day 1 = earliest imported day")
+            self.assertEqual(rows[0]["ordinal"], 1)
+
+
 class TestAnchor(unittest.TestCase):
     def test_rules_only(self):
         cfg = {"rules": [{"effective_from": "2025-06-01", "workdays": ["MO"]}]}

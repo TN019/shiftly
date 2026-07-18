@@ -229,6 +229,17 @@ def earliest_anchor_date(cfg: dict, history_csv: Path) -> dt.date:
     return min(candidates)
 
 
+def manual_shift_dates(root: Path) -> set[dt.date]:
+    """Dates of manual shifts (calendar readbacks and history imports)."""
+    out: set[dt.date] = set()
+    for item in read_json(root / "data/manual_shifts.json", []):
+        try:
+            out.add(dt.date.fromisoformat(item.get("date", "")))
+        except ValueError:
+            continue
+    return out
+
+
 def work_history_payload(root: Path | None = None) -> list[dict]:
     root = root or repo_root()
     cfg = read_json(root / "data/config.json", {})
@@ -238,11 +249,14 @@ def work_history_payload(root: Path | None = None) -> list[dict]:
     swaps = read_json(root / "data/swaps.json", [])
     leave = read_json(root / "data/leave.json", [])
     history_path = resolve_history_path(root, cfg)
+    manual = manual_shift_dates(root)
     today = dt.date.today()
     start = earliest_anchor_date(cfg, history_path)
+    if manual:
+        start = min(start, min(manual))
     if start > today:
         start = today
     planned = planned_dates(cfg, swaps, leave, start, today)
     hist = all_history_dates(history_path)
-    combined = sorted(d for d in (planned | hist) if d <= today)
+    combined = sorted(d for d in (planned | hist | manual) if d <= today)
     return [{"ymd": d.isoformat(), "ordinal": n} for n, d in enumerate(combined, start=1)]

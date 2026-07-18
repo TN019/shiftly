@@ -59,6 +59,7 @@ struct ContentView: View {
     @State var logSearchFrom = Calendar.current.date(byAdding: .month, value: -3, to: Date()) ?? Date()
     @State var logSearchTo = Date()
     @State var logSearchRan = false
+    @State var importCalendarID = ""
     @AppStorage("shiftly.section") private var storedSection = AppSection.today.rawValue
 
     private var sectionSelection: Binding<AppSection?> {
@@ -121,17 +122,26 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            NavigationSplitView {
-                List(AppSection.allCases, selection: sectionSelection) { section in
-                    Label(section.label, systemImage: section.systemImage)
-                        .tag(section)
+            Group {
+                if model.needsRootSetup {
+                    // First run: no sidebar — a single welcome screen until
+                    // a data folder is chosen (sections would all render the
+                    // same card and clicking the sidebar would look broken).
+                    welcomeScreen
+                } else {
+                    NavigationSplitView {
+                        List(AppSection.allCases, selection: sectionSelection) { section in
+                            Label(section.label, systemImage: section.systemImage)
+                                .tag(section)
+                        }
+                        .navigationSplitViewColumnWidth(min: 165, ideal: 185, max: 230)
+                        .listStyle(.sidebar)
+                    } detail: {
+                        detailPage(for: AppSection(rawValue: storedSection) ?? .today)
+                    }
+                    .navigationTitle("Shiftly")
                 }
-                .navigationSplitViewColumnWidth(min: 165, ideal: 185, max: 230)
-                .listStyle(.sidebar)
-            } detail: {
-                detailPage(for: AppSection(rawValue: storedSection) ?? .today)
             }
-            .navigationTitle("Shiftly")
             .frame(minWidth: 860, minHeight: 560)
             .onExitCommand {
                 resignAllFocus()
@@ -180,16 +190,12 @@ struct ContentView: View {
     private func detailPage(for section: AppSection) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                if model.needsRootSetup {
-                    firstRunSection
-                } else {
-                    switch section {
-                    case .today: todayPage
-                    case .calendar: calendarPage
-                    case .pay: payPage
-                    case .log: logPage
-                    case .settings: settingsPage
-                    }
+                switch section {
+                case .today: todayPage
+                case .calendar: calendarPage
+                case .pay: payPage
+                case .log: logPage
+                case .settings: settingsPage
                 }
                 if !model.statusMessage.isEmpty {
                     HStack(spacing: 10) {
@@ -528,6 +534,45 @@ struct ContentView: View {
                 .foregroundStyle(.tertiary)
         }
 
+        card("Import Calendar History") {
+            Text("One-time import: every past event of a calendar you pick becomes a worked shift with its real start and end times — work history and pay are computed from them. Existing days are never overwritten.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 10) {
+                if model.importCalendars.isEmpty {
+                    Button("Load Calendars…") {
+                        model.loadImportCalendars()
+                    }
+                    .buttonStyle(.bordered)
+                } else {
+                    Picker("", selection: $importCalendarID) {
+                        Text("Choose a calendar").tag("")
+                        ForEach(model.importCalendars) { calendar in
+                            Text(calendar.title).tag(calendar.id)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: 260)
+                    Button {
+                        model.importHistory(calendarID: importCalendarID)
+                    } label: {
+                        HStack(spacing: 6) {
+                            if model.importRunning {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: "square.and.arrow.down")
+                            }
+                            Text("Import Past Events")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(importCalendarID.isEmpty || model.importRunning)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+
         card("Work Log Folder") {
             HStack(spacing: 10) {
                 Text(model.logDir)
@@ -545,8 +590,34 @@ struct ContentView: View {
         }
     }
 
+    private var welcomeScreen: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                Image(systemName: "calendar.badge.checkmark")
+                    .font(.system(size: 56, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.top, 60)
+                Text("Welcome to Shiftly")
+                    .font(.title.weight(.bold))
+                Text("Shifts, pay and work logs — living right inside Apple Calendar.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                firstRunSection
+                    .frame(maxWidth: 560)
+                if !model.statusMessage.isEmpty {
+                    Text(model.statusMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(24)
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
     private var firstRunSection: some View {
-        card("Welcome to Shiftly") {
+        card("") {
             Text("Choose a folder to hold Shiftly's data (schedule, swaps, leave). A starter config is created if the folder is empty — an existing Shiftly data folder is picked up as is.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
