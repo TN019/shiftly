@@ -98,7 +98,7 @@
 "Swap to" = "换到";
 "Take leave on this day" = "这天请假";
 "Add leave on this day" = "这天添加请假";
-"Covered by a leave range — manage it under Today → Overrides." = "该日在请假区间内——请到「今日 → 换班与请假」管理。";
+"Covered by a leave range — manage it under Shift → Overrides." = "该日在请假区间内——请到「排班 → 换班与请假」管理。";
 "Write log entry" = "写日志";
 "Work logs arrive in milestone M5" = "工作日志将在里程碑 M5 上线";
 
@@ -393,3 +393,7 @@
 "This holiday range already exists." = "该假期区间已存在。";
 "Imported %lld holidays." = "已导入 %lld 个节假日。";
 "Holiday import failed." = "节假日导入失败。";
+
+/* Calendar holidays + widget sync */
+"Public holiday — no shift is scheduled. Manage under Shift → Holidays." = "公共假期——该日不排班。请到「排班 → 公共假期」管理。";
+"Holiday" = "节假日";

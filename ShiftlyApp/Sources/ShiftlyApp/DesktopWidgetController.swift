@@ -122,34 +122,57 @@ struct DesktopWidgetView: View {
 
             Spacer(minLength: 8)
 
-            Button {
-                model.runRoutine()
-            } label: {
-                HStack(spacing: 5) {
-                    if model.routineRunning {
-                        ProgressView()
-                            .controlSize(.mini)
-                    } else {
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 9, weight: .bold))
+            HStack(spacing: 6) {
+                Button {
+                    model.runRoutine()
+                } label: {
+                    HStack(spacing: 5) {
+                        if model.routineRunning {
+                            ProgressView()
+                                .controlSize(.mini)
+                        } else {
+                            Image(systemName: "play.fill")
+                                .font(.system(size: 9, weight: .bold))
+                        }
+                        Text("Start Work")
+                            .font(.caption.weight(.semibold))
                     }
-                    Text("Start Work")
-                        .font(.caption.weight(.semibold))
+                    .foregroundStyle(canStart ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 30)
+                    .background(
+                        canStart ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary),
+                        in: Capsule()
+                    )
+                    .contentShape(Capsule())
                 }
-                .foregroundStyle(canStart ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
-                .frame(maxWidth: .infinity)
-                .frame(height: 30)
-                .background(
-                    canStart ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary),
-                    in: Capsule()
-                )
-                .contentShape(Capsule())
+                .buttonStyle(.plain)
+                .disabled(!canStart)
+                .help(model.enabledRoutineSteps.isEmpty
+                      ? Text("Configure the routine in Shiftly → Settings")
+                      : Text(""))
+
+                Button {
+                    model.syncNow()
+                } label: {
+                    Group {
+                        if model.isBusy {
+                            ProgressView()
+                                .controlSize(.mini)
+                        } else {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(width: 30, height: 30)
+                    .background(.quaternary, in: Circle())
+                    .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(model.isBusy)
+                .help(Text("Sync Now"))
             }
-            .buttonStyle(.plain)
-            .disabled(!canStart)
-            .help(model.enabledRoutineSteps.isEmpty
-                  ? Text("Configure the routine in Shiftly → Settings")
-                  : Text(""))
         }
         .padding(16)
         .frame(width: 176, height: 176)

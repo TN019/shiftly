@@ -7,13 +7,15 @@ struct SelectedDay: Identifiable {
     var id: String { ymd }
 }
 
-/// What a calendar day shows. Precedence: leave > manual > swap-in > rule.
+/// What a calendar day shows. Precedence: leave > manual > swap-in > rule >
+/// holiday (a holiday with a shift on it means it is being worked anyway).
 enum DayCategory {
     case none
     case rule
     case swapIn
     case manual
     case leave
+    case holiday
 
     var color: Color {
         switch self {
@@ -22,6 +24,7 @@ enum DayCategory {
         case .swapIn: return .orange
         case .manual: return .purple
         case .leave: return .gray
+        case .holiday: return .red
         }
     }
 
@@ -32,6 +35,7 @@ enum DayCategory {
         case .swapIn: return "Shift (swapped)"
         case .manual: return "Shift (manual)"
         case .leave: return "Leave / day off"
+        case .holiday: return "Holiday"
         }
     }
 }
@@ -136,6 +140,11 @@ extension ContentView {
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                } else if category == .holiday, let name = holidayName(ymd) {
+                    Text(name.isEmpty ? L("Holiday") : name)
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                        .lineLimit(1)
                 }
                 if category != .none {
                     Capsule()
@@ -169,6 +178,7 @@ extension ContentView {
             legendItem(.swapIn)
             legendItem(.manual)
             legendItem(.leave)
+            legendItem(.holiday)
             Spacer(minLength: 0)
         }
         .padding(.top, 2)
@@ -234,7 +244,17 @@ extension ContentView {
                 }
                 .buttonStyle(.bordered)
             } else if category == .leave {
-                Text("Covered by a leave range — manage it under Today → Overrides.")
+                Text("Covered by a leave range — manage it under Shift → Overrides.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: 220)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if category == .holiday {
+                if let name = holidayName(ymd), !name.isEmpty {
+                    Text(name)
+                        .font(.caption.weight(.medium))
+                }
+                Text("Public holiday — no shift is scheduled. Manage under Shift → Holidays.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: 220)
@@ -270,7 +290,7 @@ extension ContentView {
             return .leave
         }
         guard let shift = model.monthShifts[ymd] else {
-            return .none
+            return holidayName(ymd) != nil ? .holiday : .none
         }
         if shift.kind == .manual {
             return .manual
@@ -279,6 +299,18 @@ extension ContentView {
             return .swapIn
         }
         return .rule
+    }
+
+    /// The holiday covering a day, if any ("" when the entry has no name).
+    func holidayName(_ ymd: String) -> String? {
+        for item in model.holidays {
+            let a = min(item.start_date, item.end_date)
+            let b = max(item.start_date, item.end_date)
+            if ymd >= a && ymd <= b {
+                return item.name
+            }
+        }
+        return nil
     }
 
     private func isOnLeave(_ ymd: String) -> Bool {
