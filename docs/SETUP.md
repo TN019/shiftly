@@ -68,7 +68,7 @@ The Python helper scripts are bundled into the app, so no repo checkout is neede
 
 **Meetings / Scripto:** recordings land in `<meetings_dir>/dd-mm-yy | hh-mm/dd-mm-yy.mp4` (AAC). Transcribe / Translate run [Scripto](https://github.com/TN019/scripto) headlessly via `uv run scripto-cli run <audio> --format srt [--translate --target zh|en]`; point **Settings → Meetings → Scripto folder** at your Scripto checkout (the folder with `pyproject.toml`). Subtitles (`*.en.srt`, `*.zh.srt`) land next to each recording and play back inside the app with cue highlighting. Translation additionally needs a local Ollama, per Scripto's own requirements.
 
-**Scheduled sync:** the in-app **Auto-sync** setting (hourly / 6h / 12h / daily) syncs while the app is open; enable **Launch at login** so it resumes after a reboot. For syncing without the app running, use the [launchd template](#scheduled-sync-launchagent) instead — the two approaches are independent.
+**Scheduled sync:** the in-app **Auto-sync** setting (hourly / 6h / 12h / daily) syncs while the app is open. Pair it with **Settings → Auto-launch** so Shiftly starts itself — either **At login** (SMAppService) or **On workdays** at a chosen time. The workday option installs a per-user LaunchAgent (`~/Library/LaunchAgents/com.shiftly.workday-launch.plist`) with one `StartCalendarInterval` entry per scheduled workday; it's regenerated automatically whenever the work schedule changes. For syncing without the app running at all, use the [launchd template](#scheduled-sync-launchagent) instead — the two approaches are independent.
 
 ## Swift app from a checkout (development)
 

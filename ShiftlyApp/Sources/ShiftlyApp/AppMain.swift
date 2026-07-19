@@ -2,7 +2,6 @@ import AppKit
 import SwiftUI
 
 let menuBarEnabledKey = "shiftly.menuBarEnabled"
-let desktopWidgetEnabledKey = "shiftly.desktopWidgetEnabled"
 
 final class ShiftlyAppDelegate: NSObject, NSApplicationDelegate {
     /// Set once the ContentView appears; widget deep links that must not
@@ -36,7 +35,7 @@ enum ShiftlyEntry {
         if CommandLine.arguments.contains("--sync") {
             exit(HeadlessSync.run())
         }
-        UserDefaults.standard.register(defaults: [menuBarEnabledKey: true, desktopWidgetEnabledKey: true])
+        UserDefaults.standard.register(defaults: [menuBarEnabledKey: true])
         ShiftlyAppMain.main()
     }
 }

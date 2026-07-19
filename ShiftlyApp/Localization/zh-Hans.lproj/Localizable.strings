@@ -495,3 +495,17 @@
 "All Shiftly data, logs, notes and meeting recordings erased. Calendar events were kept." = "Shiftly 数据、日志、笔记与会议录音已全部清除；日历事件已保留。";
 "Erase everything Shiftly stores — schedule, overrides, imported history, pay, routine, sync state, daily logs, quick notes and meeting recordings — and start over from the welcome screen. Apple Calendar events and files Shiftly does not recognize are kept." = "清除 Shiftly 存储的一切——排班规则、换班请假、导入历史、工资、上班流程、同步状态、工作日志、快速笔记与会议录音——回到首次启动的欢迎屏。Apple Calendar 事件与 Shiftly 无法识别的文件会保留。";
 "This deletes Shiftly's data files, logs, notes and meeting recordings, and resets app settings. Apple Calendar events stay. This cannot be undone." = "将删除 Shiftly 的数据文件、日志、笔记与会议录音，并重置应用设置。Apple Calendar 事件保留。此操作无法撤销。";
+
+/* Auto-launch + settings cleanup + app picker */
+"Add the desktop widgets from the system gallery: right-click the desktop → Edit Widgets → search \"Shiftly\"." = "从系统组件库添加桌面组件：右键桌面 → 编辑小组件 → 搜索「Shiftly」。";
+"Auto-launch" = "自动启动";
+"Launch Shiftly" = "启动 Shiftly";
+"Never" = "从不";
+"At login" = "登录时";
+"On workdays" = "工作日";
+"at" = "于";
+"Shiftly opens on your scheduled work days at this time — it updates automatically when your workdays change." = "Shiftly 会在你排班的工作日于此时间自动打开——工作日变化时自动更新。";
+"Choose whether Shiftly launches itself, so auto-sync and reminders keep running. Needs the bundled Shiftly.app." = "选择 Shiftly 是否自动启动，让自动同步与提醒持续运行。需要打包后的 Shiftly.app。";
+"Auto-sync runs while Shiftly is open. Headless syncing without the app uses the launchd template (see README)." = "自动同步在 Shiftly 运行期间工作；不开 App 的无人值守同步用 launchd 模板（见 README）。";
+"App…" = "应用…";
+"Choose an app to open when you start work." = "选择上班时要打开的应用。";
