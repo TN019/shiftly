@@ -3,6 +3,7 @@ import EventKit
 import Foundation
 import ServiceManagement
 import ShiftlyKit
+import WidgetKit
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -687,7 +688,43 @@ final class AppModel: ObservableObject {
             }.value
             let now = Date()
             nextShift = shifts.first { $0.end > now }
+            writeWidgetSnapshot(shifts: shifts.filter { $0.end > now })
             await rescheduleReminders(shifts: shifts)
+        }
+    }
+
+    /// Feed the native WidgetKit widgets: snapshot JSON in the shared group
+    /// container plus a timeline reload. The widget extension is sandboxed;
+    /// the group container is the one place both sides can reach.
+    private func writeWidgetSnapshot(shifts: [PlannedShift]) {
+        let dir = NSHomeDirectory() + "/Library/Group Containers/group.com.shiftly.app"
+        let dayFormat = Date.FormatStyle().weekday(.abbreviated).day().month(.abbreviated)
+        var payload: [String: Any] = [
+            "label": L("Next shift"),
+            "time": "—",
+            "sub": L("No upcoming shift in the next 45 days"),
+            "upcoming": shifts.prefix(4).map { shift in
+                [
+                    "day": shift.start.formatted(dayFormat),
+                    "time": "\(SyncFingerprint.hhmmString(for: shift.start)) – \(SyncFingerprint.hhmmString(for: shift.end))",
+                ]
+            },
+        ]
+        if let next = shifts.first {
+            payload["time"] = SyncFingerprint.hhmmString(for: next.start)
+            payload["sub"] = next.start > Date()
+                ? "\(next.start.formatted(dayFormat)) · \(next.start.formatted(.relative(presentation: .named)))"
+                : L("in progress")
+        }
+        do {
+            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+            try data.write(to: URL(fileURLWithPath: dir + "/widget.json"), options: .atomic)
+        } catch {
+            return // widgets just keep their last snapshot
+        }
+        if #available(macOS 14.0, *) {
+            WidgetCenter.shared.reloadAllTimelines()
         }
     }
 

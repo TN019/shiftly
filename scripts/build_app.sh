@@ -66,5 +66,65 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
+# Native WidgetKit widgets: hand-built extension (no Xcode). WidgetKit
+# only loads sandboxed extensions, hence the entitlement; the app group
+# is the data path between the (unsandboxed) app and the widget.
+APPEX="$APP/Contents/PlugIns/ShiftlyWidgets.appex"
+mkdir -p "$APPEX/Contents/MacOS"
+swiftc -O -parse-as-library \
+  -sdk "$(xcrun --show-sdk-path)" \
+  -target arm64-apple-macos15.0 \
+  ShiftlyApp/Widgets/ShiftlyWidgets.swift \
+  -o "$APPEX/Contents/MacOS/ShiftlyWidgets"
+
+cat > "$APPEX/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key>
+  <string>ShiftlyWidgets</string>
+  <key>CFBundleDisplayName</key>
+  <string>Shiftly</string>
+  <key>CFBundleIdentifier</key>
+  <string>com.shiftly.app.widgets</string>
+  <key>CFBundleExecutable</key>
+  <string>ShiftlyWidgets</string>
+  <key>CFBundlePackageType</key>
+  <string>XPC!</string>
+  <key>CFBundleShortVersionString</key>
+  <string>0.8.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>15.0</string>
+  <key>NSExtension</key>
+  <dict>
+    <key>NSExtensionPointIdentifier</key>
+    <string>com.apple.widgetkit-extension</string>
+  </dict>
+</dict>
+</plist>
+PLIST
+
+WIDGET_ENT="$(mktemp -t shiftly-widget-ent).plist"
+cat > "$WIDGET_ENT" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.app-sandbox</key>
+  <true/>
+  <key>com.apple.security.application-groups</key>
+  <array>
+    <string>group.com.shiftly.app</string>
+  </array>
+</dict>
+</plist>
+PLIST
+
+codesign --force -s - --entitlements "$WIDGET_ENT" "$APPEX"
+rm -f "$WIDGET_ENT"
+
 codesign --force -s - "$APP"
 echo "Built $APP"
