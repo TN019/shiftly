@@ -109,4 +109,4 @@ scripts/build_app.sh && cp -R dist/Shiftly.app /Applications/
 [PolyForm Noncommercial 1.0.0](LICENSE)——个人及其他非商业用途免费；
 商业使用需向作者另行取得授权。
 
-> Required Notice: Copyright (c) 2026 Blake Liu (https://github.com/TN019/shiftly)
+> Required Notice: Copyright (c) 2026 Zishen Liu (https://github.com/TN019/shiftly)
