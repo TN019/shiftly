@@ -435,3 +435,5 @@
 "Upcoming" = "即将到来";
 "Logs" = "日志";
 "No logs yet." = "还没有日志。";
+"Daily Logs (%lld)" = "工作日志 (%lld)";
+"Quick Notes (%lld)" = "快速笔记 (%lld)";

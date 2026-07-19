@@ -59,6 +59,7 @@ struct ContentView: View {
     @State var paySelectedMonth: String? = nil
     @State var logQuickText = ""
     @State var logSearchQuery = ""
+    @State var logsListShowsNotes = false
     @State var importCalendarID = ""
     @State var todaySwapTarget = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
     @State private var showResetConfirm = false

@@ -162,33 +162,44 @@ extension ContentView {
                 uniquingKeysWith: { a, _ in a }
             )
 
-            if logDates.isEmpty && notes.isEmpty {
-                Text(searching ? "No matches." : "No logs yet.")
-                    .font(.subheadline)
-                    .foregroundStyle(.tertiary)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 4) {
-                        if !logDates.isEmpty {
-                            Text("Daily Logs")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                            ForEach(logDates, id: \.self) { date in
-                                logRow(date: date, snippet: searching ? snippets[date] : nil)
-                            }
-                        }
-                        if !notes.isEmpty {
-                            Text("Quick Notes")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .padding(.top, logDates.isEmpty ? 0 : 6)
+            Picker("", selection: $logsListShowsNotes) {
+                Text(LF("Daily Logs (%lld)", logDates.count)).tag(false)
+                Text(LF("Quick Notes (%lld)", notes.count)).tag(true)
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 320)
+
+            if logsListShowsNotes {
+                if notes.isEmpty {
+                    Text(searching ? "No matches." : "No notes yet.")
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 4) {
                             ForEach(notes) { note in
                                 noteRow(note)
                             }
                         }
                     }
+                    .frame(maxHeight: 340)
                 }
-                .frame(maxHeight: 340)
+            } else {
+                if logDates.isEmpty {
+                    Text(searching ? "No matches." : "No logs yet.")
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(logDates, id: \.self) { date in
+                                logRow(date: date, snippet: searching ? snippets[date] : nil)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 340)
+                }
             }
         }
     }
