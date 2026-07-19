@@ -104,22 +104,25 @@ struct NextShiftBlock: View {
 struct ActionChip: View {
     let url: String
     let icon: String
-    let title: String
-    var tint: Color? = nil
+    let tint: Color
+    var title: String? = nil
 
     var body: some View {
         Link(destination: URL(string: url)!) {
             HStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 9, weight: .bold))
-                Text(title)
-                    .font(.caption2.weight(.semibold))
-                    .lineLimit(1)
+                    .font(.system(size: 10, weight: .bold))
+                if let title {
+                    Text(title)
+                        .font(.caption2.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 5)
-            .background(Capsule().fill((tint ?? .primary).opacity(tint == nil ? 0.08 : 0.18)))
-            .foregroundStyle(tint ?? .primary)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(tint.opacity(0.20)))
+            .foregroundStyle(tint)
         }
     }
 }
@@ -165,32 +168,30 @@ struct ShiftlyWidgetView: View {
                     }
                     HStack(spacing: 6) {
                         ActionChip(url: "shiftly://start-work", icon: "play.fill",
-                                   title: "Start Work", tint: .accentColor)
+                                   tint: .blue, title: "Start Work")
                         ActionChip(url: "shiftly://record",
                                    icon: isRecording ? "stop.fill" : "mic.fill",
-                                   title: isRecording ? "Stop Rec" : "Record",
-                                   tint: isRecording ? .red : nil)
+                                   tint: isRecording ? .red : .orange,
+                                   title: isRecording ? "Stop" : "Meeting")
                         ActionChip(url: "shiftly://new-note",
-                                   icon: "note.text.badge.plus", title: "Note")
+                                   icon: "square.and.pencil", tint: .purple, title: "QNotes")
                     }
                 }
             default:
                 VStack(spacing: 6) {
                     NextShiftBlock(snapshot: entry.snapshot)
                     HStack(spacing: 6) {
-                        ActionChip(url: "shiftly://start-work", icon: "play.fill",
-                                   title: "Start", tint: .accentColor)
+                        ActionChip(url: "shiftly://start-work", icon: "play.fill", tint: .blue)
                         ActionChip(url: "shiftly://record",
                                    icon: isRecording ? "stop.fill" : "mic.fill",
-                                   title: isRecording ? "Stop" : "Rec",
-                                   tint: isRecording ? .red : nil)
+                                   tint: isRecording ? .red : .orange)
                         ActionChip(url: "shiftly://new-note",
-                                   icon: "note.text.badge.plus", title: "Note")
+                                   icon: "square.and.pencil", tint: .purple)
                     }
                 }
             }
         }
-        .containerBackground(.fill.tertiary, for: .widget)
+        .containerBackground(.background, for: .widget)
     }
 }
 
