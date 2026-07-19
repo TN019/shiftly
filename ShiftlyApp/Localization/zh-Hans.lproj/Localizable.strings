@@ -478,3 +478,20 @@
 "Use Transcribe / Translate in the meeting list; the subtitles appear here once Scripto finishes." = "在会议列表中点 转录/翻译；Scripto 完成后字幕会显示在这里。";
 "No recording file in this folder." = "该文件夹中没有录音文件。";
 "Transcript" = "转录";
+
+/* Storage layout */
+"Storage" = "存储";
+"Data" = "数据";
+"Notes" = "笔记";
+"Move…" = "迁移…";
+"Everything in the current folder moves to the one you pick." = "当前文件夹的全部内容会移动到你选择的文件夹。";
+"Changing a location moves everything already there — nothing stays behind. First-run setup lays these out as <folder>/app/data, app/meetings, logs and notes." = "更改位置会把已有内容全部迁移过去——原路径不留任何文件。首次设置会在所选文件夹下自动创建 app/data、app/meetings、logs 和 notes。";
+"Storage ready. Set your weekly schedule, then Sync Now." = "存储已就绪。设置每周排班后点击「立即同步」。";
+"Data moved to the new folder." = "数据已迁移到新文件夹。";
+"Logs moved to the new folder." = "日志已迁移到新文件夹。";
+"Notes moved to the new folder." = "笔记已迁移到新文件夹。";
+"Meetings moved to the new folder." = "会议已迁移到新文件夹。";
+"Move failed: %@" = "迁移失败：%@";
+"All Shiftly data, logs, notes and meeting recordings erased. Calendar events were kept." = "Shiftly 数据、日志、笔记与会议录音已全部清除；日历事件已保留。";
+"Erase everything Shiftly stores — schedule, overrides, imported history, pay, routine, sync state, daily logs, quick notes and meeting recordings — and start over from the welcome screen. Apple Calendar events and files Shiftly does not recognize are kept." = "清除 Shiftly 存储的一切——排班规则、换班请假、导入历史、工资、上班流程、同步状态、工作日志、快速笔记与会议录音——回到首次启动的欢迎屏。Apple Calendar 事件与 Shiftly 无法识别的文件会保留。";
+"This deletes Shiftly's data files, logs, notes and meeting recordings, and resets app settings. Apple Calendar events stay. This cannot be undone." = "将删除 Shiftly 的数据文件、日志、笔记与会议录音，并重置应用设置。Apple Calendar 事件保留。此操作无法撤销。";

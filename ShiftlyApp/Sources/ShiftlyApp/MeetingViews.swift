@@ -49,18 +49,6 @@ extension ContentView {
         String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
 
-    func chooseMeetingsFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.canCreateDirectories = true
-        panel.prompt = "Use This Folder"
-        panel.message = "Choose the folder for meeting recordings."
-        if panel.runModal() == .OK, let url = panel.url {
-            model.adoptMeetingsDir(url)
-        }
-    }
-
     func chooseScriptoFolder() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false

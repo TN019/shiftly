@@ -151,19 +151,79 @@ final class AppModel: ObservableObject {
     /// True when no data root could be resolved: the first-run view is shown.
     var needsRootSetup: Bool { !paths.isValid }
 
-    /// First-run flow: adopt a user-chosen folder as the data root,
-    /// creating starter data files when missing.
+    /// First-run flow: provision the standard storage layout (app/data,
+    /// app/meetings, logs, notes) under the chosen folder — an existing
+    /// data root is adopted as-is.
     func adoptRoot(_ url: URL) {
         do {
-            let root = url.path
-            try ShiftlyPaths.bootstrapDataDirectory(atRoot: root)
+            let root = try StorageLayout.provision(selectedPath: url.path)
             ShiftlyPaths.persistRoot(root)
             paths = ShiftlyPaths(root: root)
-            statusMessage = L("Data folder ready. Set your weekly schedule, then Sync Now.")
+            statusMessage = L("Storage ready. Set your weekly schedule, then Sync Now.")
             load()
             startWatching()
         } catch {
             statusMessage = LF("Could not prepare data folder: %@", error.localizedDescription)
+        }
+    }
+
+    // MARK: Storage relocation (move, never leave content behind)
+
+    /// Move the data root (data/, and any sibling folders like meetings
+    /// that live inside it) into the picked folder, which becomes the new
+    /// root. Config paths inside the old root are rewritten.
+    func changeDataFolder(to url: URL) {
+        noteOwnWrite()
+        let oldRoot = paths.root
+        let newRoot = url.path
+        guard newRoot != oldRoot else { return }
+        do {
+            try StorageLayout.moveContents(of: oldRoot, to: newRoot)
+            var raw = try ConfigLogic.readRawConfig(atPath: "\(newRoot)/data/config.json")
+            for key in ["log_dir", "notes_dir", "meetings_dir"] {
+                if let value = raw[key] as? String, value.hasPrefix(oldRoot + "/") {
+                    raw[key] = newRoot + value.dropFirst(oldRoot.count)
+                }
+            }
+            try ConfigLogic.writeRawConfig(raw, toPath: "\(newRoot)/data/config.json")
+            ShiftlyPaths.persistRoot(newRoot)
+            paths = ShiftlyPaths(root: newRoot)
+            load()
+            startWatching()
+            statusMessage = L("Data moved to the new folder.")
+        } catch {
+            statusMessage = LF("Move failed: %@", error.localizedDescription)
+        }
+    }
+
+    func changeLogDir(to url: URL) {
+        relocate(from: logDir, to: url.path, configKey: "log_dir",
+                 done: L("Logs moved to the new folder."))
+    }
+
+    func changeNotesDir(to url: URL) {
+        relocate(from: notesDir, to: url.path, configKey: "notes_dir",
+                 done: L("Notes moved to the new folder."))
+    }
+
+    func changeMeetingsDir(to url: URL) {
+        relocate(from: meetingsDir, to: url.path, configKey: "meetings_dir",
+                 done: L("Meetings moved to the new folder."))
+    }
+
+    private func relocate(from oldDir: String, to newDir: String, configKey: String, done: String) {
+        noteOwnWrite()
+        guard newDir != oldDir else { return }
+        do {
+            try StorageLayout.moveContents(of: oldDir, to: newDir)
+            var raw = try ConfigLogic.readRawConfig(atPath: paths.configPath)
+            raw[configKey] = newDir
+            try ConfigLogic.writeRawConfig(raw, toPath: paths.configPath)
+            load()
+            startWatching()
+            statusMessage = done
+        } catch {
+            statusMessage = LF("Move failed: %@", error.localizedDescription)
         }
     }
 
@@ -172,8 +232,11 @@ final class AppModel: ObservableObject {
     /// Apple Calendar events and work-log files are left untouched.
     func resetAllData() {
         guard paths.isValid else { return }
+        if isRecording { stopRecording() }
         watcher?.stop()
         watcher = nil
+        DataReset.wipeLogs(logDir: logDir, notesDir: notesDir)
+        DataReset.wipeMeetings(dir: meetingsDir)
         do {
             try DataReset.wipeData(atRoot: paths.root)
         } catch {
@@ -208,11 +271,15 @@ final class AppModel: ObservableObject {
         payMonths = []
         payYearToDate = 0
         routine = []
+        meetings = []
+        quickNotes = []
+        logDates = []
+        todayLogContent = nil
         lastReport = nil
         readbackLog = []
         lastSyncText = "-"
         syncState = .unsynced
-        statusMessage = L("All Shiftly data erased. Calendar events and work logs were kept.")
+        statusMessage = L("All Shiftly data, logs, notes and meeting recordings erased. Calendar events were kept.")
     }
 
     let dayOrder = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
@@ -365,33 +432,6 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Point config at a different log folder. Existing files are neither
-    /// moved nor deleted.
-    func adoptLogDir(_ url: URL) {
-        noteOwnWrite()
-        do {
-            try store.saveLogDir(url.path)
-            refreshLogState()
-            startWatching()
-            statusMessage = L("Log folder updated. Existing logs stay in the old folder.")
-        } catch {
-            statusMessage = LF("Could not save log folder: %@", error.localizedDescription)
-        }
-    }
-
-    /// Point config at a different quick-notes folder. Existing files are
-    /// neither moved nor deleted.
-    func adoptNotesDir(_ url: URL) {
-        noteOwnWrite()
-        do {
-            try store.saveNotesDir(url.path)
-            refreshLogState()
-            startWatching()
-            statusMessage = L("Notes folder updated. Existing notes stay in the old folder.")
-        } catch {
-            statusMessage = LF("Could not save notes folder: %@", error.localizedDescription)
-        }
-    }
 
     /// Ensure a day's log exists (frontmatter pre-filled from the plan) and
     /// return its path; nil on failure.
@@ -445,16 +485,6 @@ final class AppModel: ObservableObject {
         meetings = meetingStore.meetings()
     }
 
-    func adoptMeetingsDir(_ url: URL) {
-        noteOwnWrite()
-        do {
-            try store.saveMeetingSetting(key: "meetings_dir", value: url.path)
-            refreshMeetings()
-            statusMessage = L("Meetings folder updated.")
-        } catch {
-            statusMessage = LF("Save failed: %@", error.localizedDescription)
-        }
-    }
 
     func adoptScriptoDir(_ url: URL) {
         noteOwnWrite()

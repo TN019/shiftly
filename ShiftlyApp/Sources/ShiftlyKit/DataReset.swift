@@ -22,6 +22,56 @@ public enum DataReset {
         "readback_log.json",
     ]
 
+    /// Delete every daily log and quick note Shiftly recognizes (current
+    /// dd-mm-yy layout, legacy YYYY/YYYY-MM-DD.md, notes `dd-mm-yy | *.md`).
+    /// Foreign files stay; emptied folders are removed.
+    public static func wipeLogs(logDir: String, notesDir: String) {
+        let fm = FileManager.default
+        let logs = (logDir as NSString).expandingTildeInPath
+        for name in (try? fm.contentsOfDirectory(atPath: logs)) ?? [] {
+            if WorkLogStore.date(fromFileName: name) != nil {
+                try? fm.removeItem(atPath: "\(logs)/\(name)")
+            } else if name.count == 4, Int(name) != nil {
+                let yearDir = "\(logs)/\(name)"
+                for file in (try? fm.contentsOfDirectory(atPath: yearDir)) ?? []
+                where file.hasSuffix(".md") {
+                    try? fm.removeItem(atPath: "\(yearDir)/\(file)")
+                }
+                removeIfEmpty(yearDir)
+            }
+        }
+        let notes = (notesDir as NSString).expandingTildeInPath
+        for name in (try? fm.contentsOfDirectory(atPath: notes)) ?? [] {
+            let stem = name.hasSuffix(".md") ? String(name.dropLast(3)) : name
+            if let sep = stem.range(of: " | "),
+               WorkLogStore.date(fromFileName: String(stem[..<sep.lowerBound]) + ".md") != nil {
+                try? fm.removeItem(atPath: "\(notes)/\(name)")
+            }
+        }
+        removeIfEmpty(notes)
+        removeIfEmpty(logs)
+    }
+
+    /// Delete every meeting folder Shiftly recognizes (recordings and
+    /// subtitles included); anything else in the folder stays.
+    public static func wipeMeetings(dir: String) {
+        let fm = FileManager.default
+        let root = (dir as NSString).expandingTildeInPath
+        for name in (try? fm.contentsOfDirectory(atPath: root)) ?? []
+        where MeetingStore.parseFolderName(name) != nil {
+            try? fm.removeItem(atPath: "\(root)/\(name)")
+        }
+        removeIfEmpty(root)
+    }
+
+    private static func removeIfEmpty(_ path: String) {
+        let fm = FileManager.default
+        if let rest = try? fm.contentsOfDirectory(atPath: path),
+           rest.allSatisfy({ $0 == ".DS_Store" }) {
+            try? fm.removeItem(atPath: path)
+        }
+    }
+
     /// Returns how many files were deleted.
     @discardableResult
     public static func wipeData(atRoot root: String) throws -> Int {
