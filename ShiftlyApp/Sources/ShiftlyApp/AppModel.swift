@@ -540,6 +540,7 @@ final class AppModel: ObservableObject {
             }
             audioRecorder = recorder
             isRecording = true
+            refreshNextShift() // widget snapshot picks up the recording state
             recordingSeconds = 0
             recordTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
                 Task { @MainActor in
@@ -561,6 +562,7 @@ final class AppModel: ObservableObject {
         recordTimer = nil
         isRecording = false
         refreshMeetings()
+        refreshNextShift() // widget snapshot drops the recording state
         statusMessage = L("Recording saved.")
     }
 
@@ -631,6 +633,20 @@ final class AppModel: ObservableObject {
             statusMessage = L("Meeting moved to Trash.")
         } catch {
             statusMessage = LF("Delete failed: %@", error.localizedDescription)
+        }
+    }
+
+    /// Widget deep links (shiftly://start-work | record | new-note).
+    func handleDeepLink(_ url: URL) {
+        switch url.host ?? url.lastPathComponent {
+        case "start-work":
+            runRoutine()
+        case "record":
+            isRecording ? stopRecording() : startRecording()
+        case "new-note":
+            newQuickNote()
+        default:
+            break
         }
     }
 
@@ -917,6 +933,7 @@ final class AppModel: ObservableObject {
             "label": L("Next shift"),
             "time": "—",
             "sub": L("No upcoming shift in the next 45 days"),
+            "recording": isRecording,
             "upcoming": shifts.prefix(4).map { shift in
                 [
                     "day": shift.start.formatted(dayFormat),

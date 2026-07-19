@@ -153,6 +153,9 @@ struct ContentView: View {
             .onExitCommand {
                 resignAllFocus()
             }
+            .onOpenURL { url in
+                model.handleDeepLink(url)
+            }
             .onAppear {
                 model.load()
                 model.startAutoSyncIfEnabled()

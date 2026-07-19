@@ -64,6 +64,17 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <string>Shiftly keeps your Shifts calendar in sync with your work schedule.</string>
   <key>NSMicrophoneUsageDescription</key>
   <string>Shiftly records meeting audio into your meetings folder when you press Record.</string>
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>com.shiftly.app.deeplink</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>shiftly</string>
+      </array>
+    </dict>
+  </array>
 </dict>
 </plist>
 PLIST
