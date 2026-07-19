@@ -64,6 +64,17 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <string>Shiftly keeps your Shifts calendar in sync with your work schedule.</string>
   <key>NSMicrophoneUsageDescription</key>
   <string>Shiftly records meeting audio into your meetings folder when you press Record.</string>
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLName</key>
+      <string>com.shiftly.app.deeplink</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>shiftly</string>
+      </array>
+    </dict>
+  </array>
 </dict>
 </plist>
 PLIST
@@ -73,9 +84,12 @@ PLIST
 # is the data path between the (unsandboxed) app and the widget.
 APPEX="$APP/Contents/PlugIns/ShiftlyWidgets.appex"
 mkdir -p "$APPEX/Contents/MacOS"
+# App extensions enter through NSExtensionMain (XPC bootstrap), not a
+# plain Swift main — WidgetKit then instantiates the @main WidgetBundle.
 swiftc -O -parse-as-library \
   -sdk "$(xcrun --show-sdk-path)" \
   -target arm64-apple-macos15.0 \
+  -Xlinker -e -Xlinker _NSExtensionMain \
   ShiftlyApp/Widgets/ShiftlyWidgets.swift \
   -o "$APPEX/Contents/MacOS/ShiftlyWidgets"
 
@@ -94,8 +108,16 @@ cat > "$APPEX/Contents/Info.plist" <<'PLIST'
   <string>ShiftlyWidgets</string>
   <key>CFBundlePackageType</key>
   <string>XPC!</string>
+  <key>CFBundleSupportedPlatforms</key>
+  <array>
+    <string>MacOSX</string>
+  </array>
+  <key>DTPlatformName</key>
+  <string>macosx</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.8.0</string>
+  <string>0.7.0</string>
   <key>CFBundleVersion</key>
   <string>1</string>
   <key>LSMinimumSystemVersion</key>
@@ -103,6 +125,11 @@ cat > "$APPEX/Contents/Info.plist" <<'PLIST'
   <key>NSExtension</key>
   <dict>
     <key>NSExtensionPointIdentifier</key>
+    <string>com.apple.widgetkit-extension</string>
+  </dict>
+  <key>EXAppExtensionAttributes</key>
+  <dict>
+    <key>EXExtensionPointIdentifier</key>
     <string>com.apple.widgetkit-extension</string>
   </dict>
 </dict>

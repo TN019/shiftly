@@ -20,6 +20,7 @@ struct Snapshot: Decodable {
     let time: String
     let sub: String
     let upcoming: [UpcomingLine]
+    let recording: Bool?
 }
 
 struct ShiftEntry: TimelineEntry {
@@ -33,7 +34,8 @@ private let placeholderSnapshot = Snapshot(
         UpcomingLine(day: "Tue 21 Jul", time: "10:00 – 18:30"),
         UpcomingLine(day: "Fri 24 Jul", time: "10:00 – 18:30"),
         UpcomingLine(day: "Sat 25 Jul", time: "10:00 – 18:30"),
-    ]
+    ],
+    recording: false
 )
 
 struct Provider: TimelineProvider {
@@ -60,7 +62,7 @@ struct Provider: TimelineProvider {
               let data = try? Data(contentsOf: url),
               let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) else {
             return Snapshot(label: "Next shift", time: "—",
-                            sub: "Open Shiftly once", upcoming: [])
+                            sub: "Open Shiftly once", upcoming: [], recording: false)
         }
         return snapshot
     }
@@ -98,47 +100,100 @@ struct NextShiftBlock: View {
     }
 }
 
+/// Deep-link chip: tapping activates Shiftly and fires the action.
+struct ActionChip: View {
+    let url: String
+    let icon: String
+    let tint: Color
+    var title: String? = nil
+
+    var body: some View {
+        Link(destination: URL(string: url)!) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 10, weight: .bold))
+                if let title {
+                    Text(title)
+                        .font(.caption2.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(tint.opacity(0.20)))
+            .foregroundStyle(tint)
+        }
+    }
+}
+
 struct ShiftlyWidgetView: View {
     @Environment(\.widgetFamily) private var family
     var entry: ShiftEntry
+
+    private var isRecording: Bool { entry.snapshot.recording ?? false }
 
     var body: some View {
         Group {
             switch family {
             case .systemMedium:
-                HStack(spacing: 14) {
-                    NextShiftBlock(snapshot: entry.snapshot)
-                    Divider()
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Upcoming")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                        if entry.snapshot.upcoming.isEmpty {
-                            Text("No shifts planned")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                        } else {
-                            ForEach(entry.snapshot.upcoming.prefix(3), id: \.day) { line in
-                                HStack(spacing: 8) {
-                                    Text(line.day)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .frame(width: 76, alignment: .leading)
-                                    Text(line.time)
-                                        .font(.caption.weight(.medium))
-                                        .monospacedDigit()
+                VStack(spacing: 8) {
+                    HStack(spacing: 14) {
+                        NextShiftBlock(snapshot: entry.snapshot)
+                        Divider()
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("Upcoming")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            if entry.snapshot.upcoming.isEmpty {
+                                Text("No shifts planned")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            } else {
+                                ForEach(entry.snapshot.upcoming.prefix(3), id: \.day) { line in
+                                    HStack(spacing: 8) {
+                                        Text(line.day)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .frame(width: 76, alignment: .leading)
+                                        Text(line.time)
+                                            .font(.caption.weight(.medium))
+                                            .monospacedDigit()
+                                    }
                                 }
                             }
+                            Spacer(minLength: 0)
                         }
-                        Spacer(minLength: 0)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
                     }
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    HStack(spacing: 6) {
+                        ActionChip(url: "shiftly://start-work", icon: "play.fill",
+                                   tint: .blue, title: "Start Work")
+                        ActionChip(url: "shiftly://meetings",
+                                   icon: isRecording ? "waveform" : "mic.fill",
+                                   tint: isRecording ? .red : .orange,
+                                   title: isRecording ? "Recording" : "Meeting")
+                        ActionChip(url: "shiftly://new-note",
+                                   icon: "square.and.pencil", tint: .purple, title: "QNotes")
+                    }
                 }
             default:
-                NextShiftBlock(snapshot: entry.snapshot)
+                VStack(spacing: 6) {
+                    NextShiftBlock(snapshot: entry.snapshot)
+                    HStack(spacing: 6) {
+                        ActionChip(url: "shiftly://start-work", icon: "play.fill", tint: .blue)
+                        ActionChip(url: "shiftly://meetings",
+                                   icon: isRecording ? "waveform" : "mic.fill",
+                                   tint: isRecording ? .red : .orange)
+                        ActionChip(url: "shiftly://new-note",
+                                   icon: "square.and.pencil", tint: .purple)
+                    }
+                }
             }
         }
-        .containerBackground(.fill.tertiary, for: .widget)
+        .containerBackground(.background, for: .widget)
+        // Clicking anywhere outside the chips opens Shiftly itself.
+        .widgetURL(URL(string: "shiftly://open"))
     }
 }
 

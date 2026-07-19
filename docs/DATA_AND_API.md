@@ -33,6 +33,24 @@
 App 的 Settings → Reset 删除上表 `data/` 下的全部 Shiftly 文件并重置应用偏好；
 `data/` 中的非 Shiftly 文件、工作日志与 Apple Calendar 事件一律保留。
 
+## 0.5 存储布局
+
+首次设置选定一个文件夹后，Shiftly 自动创建：
+
+```
+<所选文件夹>/
+├── app/
+│   ├── data/       ← 数据根（ShiftlyPaths.root = <所选文件夹>/app）
+│   └── meetings/   ← 会议录音
+├── logs/           ← 工作日志
+└── notes/          ← 快速笔记
+```
+
+已是数据根的文件夹（含 data/config.json）被原样接管（旧布局兼容）。四个位置均可在
+Settings → Storage 单独迁移：**迁移 = 移动全部既有内容**，目标冲突时整体中止、绝不覆盖，
+原路径不留文件。Settings → Reset 依据这些路径清除全部 Shiftly 内容（数据文件白名单、
+可识别的日志/笔记文件、可识别的会议文件夹；无法识别的文件保留）。
+
 ## 1. 数据文件 Schema
 
 ### 1.1 config.json（config_version 2；v1 无 shift_types/log_dir 亦可读）

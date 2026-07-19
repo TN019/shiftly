@@ -153,7 +153,11 @@ struct ContentView: View {
             .onExitCommand {
                 resignAllFocus()
             }
+            .onOpenURL { url in
+                model.handleDeepLink(url)
+            }
             .onAppear {
+                ShiftlyAppDelegate.model = model
                 model.load()
                 model.startAutoSyncIfEnabled()
                 model.applyMenuBarPreference()
@@ -566,22 +570,20 @@ struct ContentView: View {
                 .foregroundStyle(.tertiary)
         }
 
-        card("Data Folder") {
-            HStack(spacing: 10) {
-                Text(model.paths.root)
-                    .font(.system(.caption, design: .monospaced))
-                    .textSelection(.enabled)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer(minLength: 0)
-                Button("Show in Finder") {
-                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: model.paths.root)
-                }
-                .buttonStyle(.bordered)
-                Button("Change…") { chooseDataFolder() }
-                    .buttonStyle(.bordered)
+        card("Storage") {
+            storageRow(L("Data"), path: model.paths.root) { url in
+                model.changeDataFolder(to: url)
             }
-            Text("Changing the folder does not move existing data. The SHIFTLY_ROOT environment variable overrides this choice when set.")
+            storageRow(L("Logs"), path: model.logDir) { url in
+                model.changeLogDir(to: url)
+            }
+            storageRow(L("Notes"), path: model.notesDir) { url in
+                model.changeNotesDir(to: url)
+            }
+            storageRow(L("Meetings"), path: model.meetingsDir) { url in
+                model.changeMeetingsDir(to: url)
+            }
+            Text("Changing a location moves everything already there — nothing stays behind. First-run setup lays these out as <folder>/app/data, app/meetings, logs and notes.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
@@ -625,33 +627,7 @@ struct ContentView: View {
             }
         }
 
-        card("Work Log Folder") {
-            HStack(spacing: 10) {
-                Text(model.logDir)
-                    .font(.system(.caption, design: .monospaced))
-                    .textSelection(.enabled)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer(minLength: 0)
-                Button("Change…") { chooseLogFolder() }
-                    .buttonStyle(.bordered)
-            }
-            Text("New logs go to the new folder; existing files are neither moved nor deleted.")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-        }
-
         card("Meetings") {
-            HStack(spacing: 10) {
-                Text("Recordings folder").font(.caption).foregroundStyle(.secondary)
-                Text(model.meetingsDir)
-                    .font(.system(.caption, design: .monospaced))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer(minLength: 0)
-                Button("Change…") { chooseMeetingsFolder() }
-                    .buttonStyle(.bordered)
-            }
             HStack(spacing: 10) {
                 Text("Scripto folder").font(.caption).foregroundStyle(.secondary)
                 Text(model.scriptoDir.isEmpty ? L("Not set") : model.scriptoDir)
@@ -681,24 +657,8 @@ struct ContentView: View {
                 .foregroundStyle(.tertiary)
         }
 
-        card("Quick Notes Folder") {
-            HStack(spacing: 10) {
-                Text(model.notesDir)
-                    .font(.system(.caption, design: .monospaced))
-                    .textSelection(.enabled)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer(minLength: 0)
-                Button("Change…") { chooseNotesFolder() }
-                    .buttonStyle(.bordered)
-            }
-            Text("New notes go to the new folder; existing files are neither moved nor deleted.")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-        }
-
         card("Reset") {
-            Text("Erase all Shiftly data — schedule, overrides, imported history, pay, routine and sync state — and start over from the welcome screen. Apple Calendar events and work log files are not touched.")
+            Text("Erase everything Shiftly stores — schedule, overrides, imported history, pay, routine, sync state, daily logs, quick notes and meeting recordings — and start over from the welcome screen. Apple Calendar events and files Shiftly does not recognize are kept.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -718,7 +678,7 @@ struct ContentView: View {
             Button("Erase Everything", role: .destructive) { model.resetAllData() }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This deletes Shiftly's files in the data folder and resets app settings. Apple Calendar events and work logs stay. This cannot be undone.")
+            Text("This deletes Shiftly's data files, logs, notes and meeting recordings, and resets app settings. Apple Calendar events stay. This cannot be undone.")
         }
     }
 
@@ -785,6 +745,40 @@ struct ContentView: View {
             get: { model.menuBarEnabled },
             set: { model.setMenuBarEnabled($0) }
         )
+    }
+
+    @ViewBuilder
+    func storageRow(_ label: String, path: String, onPick: @escaping (URL) -> Void) -> some View {
+        HStack(spacing: 10) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 64, alignment: .leading)
+            Text(path)
+                .font(.system(.caption, design: .monospaced))
+                .textSelection(.enabled)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 0)
+            Button("Show in Finder") {
+                NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            Button("Move…") {
+                let panel = NSOpenPanel()
+                panel.canChooseFiles = false
+                panel.canChooseDirectories = true
+                panel.canCreateDirectories = true
+                panel.prompt = "Move Here"
+                panel.message = L("Everything in the current folder moves to the one you pick.")
+                if panel.runModal() == .OK, let url = panel.url {
+                    onPick(url)
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
     }
 
     private func chooseDataFolder() {

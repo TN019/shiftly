@@ -300,19 +300,7 @@ extension ContentView {
         panel.prompt = "Use This Folder"
         panel.message = "Choose the folder for your work logs."
         if panel.runModal() == .OK, let url = panel.url {
-            model.adoptLogDir(url)
-        }
-    }
-
-    func chooseNotesFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.canCreateDirectories = true
-        panel.prompt = "Use This Folder"
-        panel.message = "Choose the folder for your quick notes."
-        if panel.runModal() == .OK, let url = panel.url {
-            model.adoptNotesDir(url)
+            model.changeLogDir(to: url)
         }
     }
 }
