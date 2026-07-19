@@ -6,7 +6,10 @@
 
 **排班、工资、工作日志——都住进你的 Apple 日历。**
 
-💻 macOS 13+ &nbsp;·&nbsp; 🦉 Swift 5.9 &nbsp;·&nbsp; 📄 [PolyForm NC](LICENSE) &nbsp;·&nbsp; 🏷️ [发布版本](https://github.com/TN019/shiftly/releases/latest)
+[![macOS](https://img.shields.io/badge/macOS-13%2B-blue)](docs/SETUP.md)
+[![Swift](https://img.shields.io/badge/Swift-5.9-orange)](docs/SETUP.md)
+[![License](https://img.shields.io/badge/license-PolyForm%20NC-lightgrey)](LICENSE)
+[![Release](https://img.shields.io/badge/release-v0.8.0-brightgreen)](https://github.com/TN019/shiftly/releases/latest)
 
 [English](README.md) · [简体中文](README.zh-Hans.md)
 
