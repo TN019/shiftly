@@ -403,3 +403,16 @@
 "min / shift" = "分钟 / 每班";
 "Unpaid break saved." = "无薪休息已保存。";
 "Subtracted from every shift's paid hours — e.g. 10:00–18:30 with a 30 min break pays 8 h." = "从每班的计薪时长中扣除——例如 10:00–18:30 含 30 分钟休息，计薪 8 小时。";
+
+/* Daily log vs quick notes */
+"Daily Log" = "工作日志";
+"Daily log — appended with a timestamp" = "工作日志——带时间戳追加";
+"No shift today — entries go to %@, the last workday." = "今天没有排班——记录会写入上一个工作日 %@ 的日志。";
+"Quick Notes" = "快速笔记";
+"Quick note" = "快速笔记";
+"Note title" = "笔记标题";
+"Note title — creates dd-mm-yy | title.md and opens it" = "笔记标题——创建 dd-mm-yy | 标题.md 并打开";
+"Create" = "创建";
+"No notes yet." = "还没有笔记。";
+"Note create failed: %@" = "笔记创建失败：%@";
+"Daily Markdown logs live in a folder you own — one file per shift day (dd-mm-yy.md) with the shift pre-filled, plus standalone quick notes (dd-mm-yy | title.md), editable with any app." = "Markdown 日志存放在你自己的文件夹——每个班一个文件（dd-mm-yy.md，预填班次信息），另有独立快速笔记（dd-mm-yy | 标题.md），任何 app 均可编辑。";

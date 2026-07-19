@@ -56,6 +56,7 @@ struct ContentView: View {
     @AppStorage("shiftly.payDisplayCurrency") var payDisplayCurrency = "AUD"
     @State var paySelectedMonth: String? = nil
     @State var logQuickText = ""
+    @State var quickNoteTitle = ""
     @State var logShowRaw = false
     @State var logSearchQuery = ""
     @State var logSearchUseRange = false

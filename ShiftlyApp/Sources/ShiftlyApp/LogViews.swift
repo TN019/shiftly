@@ -7,10 +7,71 @@ extension ContentView {
         if model.logDirExists {
             logQuickCaptureCard
             logTodayCard
+            quickNotesCard
             logSearchCard
         } else {
             logSetupCard
         }
+    }
+
+    // MARK: Quick notes
+
+    private var quickNotesCard: some View {
+        card("Quick Notes") {
+            HStack(spacing: 10) {
+                Image(systemName: "note.text.badge.plus")
+                    .font(.title3)
+                    .foregroundStyle(Color.accentColor)
+                TextField("Note title — creates dd-mm-yy | title.md and opens it", text: $quickNoteTitle)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { submitQuickNote() }
+                Button("Create") { submitQuickNote() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(quickNoteTitle.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            if !model.quickNotes.isEmpty {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(model.quickNotes) { note in
+                            Button {
+                                NSWorkspace.shared.open(URL(fileURLWithPath: note.path))
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Text(note.date)
+                                        .font(.system(.subheadline, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                    Text(note.title)
+                                        .font(.subheadline)
+                                        .lineLimit(1)
+                                    Spacer(minLength: 0)
+                                    Image(systemName: "arrow.up.forward.square")
+                                        .font(.caption)
+                                        .foregroundStyle(.tertiary)
+                                }
+                                .padding(.vertical, 5)
+                                .padding(.horizontal, 10)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color.primary.opacity(0.05))
+                            )
+                        }
+                    }
+                }
+                .frame(maxHeight: 220)
+            } else {
+                Text("No notes yet.")
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private func submitQuickNote() {
+        model.createQuickNote(title: quickNoteTitle)
+        quickNoteTitle = ""
     }
 
     // MARK: Search
@@ -85,7 +146,7 @@ extension ContentView {
 
     private var logSetupCard: some View {
         card("Work Log") {
-            Text("Daily Markdown logs live in a folder you own — one file per day (YYYY/YYYY-MM-DD.md) with the shift pre-filled, editable with any app.")
+            Text("Daily Markdown logs live in a folder you own — one file per shift day (dd-mm-yy.md) with the shift pre-filled, plus standalone quick notes (dd-mm-yy | title.md), editable with any app.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -116,12 +177,17 @@ extension ContentView {
                 Image(systemName: "square.and.pencil")
                     .font(.title3)
                     .foregroundStyle(Color.accentColor)
-                TextField("Quick note — appended to today's log with a timestamp", text: $logQuickText)
+                TextField("Daily log — appended with a timestamp", text: $logQuickText)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { submitQuickCapture() }
                 Button("Add") { submitQuickCapture() }
                     .buttonStyle(.borderedProminent)
                     .disabled(logQuickText.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+            if model.activeLogDate != ContentView.ymdString(Date()) {
+                Text(LF("No shift today — entries go to %@, the last workday.", model.activeLogDate))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
         }
     }
@@ -134,7 +200,10 @@ extension ContentView {
     // MARK: Today's log
 
     private var logTodayCard: some View {
-        card("Today's Log") {
+        card("Daily Log") {
+            Text(model.activeLogDate)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(.secondary)
             HStack(spacing: 10) {
                 Picker("", selection: $logShowRaw) {
                     Text("Preview").tag(false)

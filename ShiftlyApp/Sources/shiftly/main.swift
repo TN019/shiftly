@@ -93,6 +93,19 @@ guard paths.isValid else {
 let store = DataStore(paths: paths)
 let dataSource = SyncDataSource(store: store, provider: PlannerScriptProvider(root: paths.root))
 
+/// Daily-log target date: today when today has a shift, else the most
+/// recent workday within two weeks (today as a last resort).
+func activeLogDate() -> String {
+    let today = todayYMD()
+    guard let from = Calendar.current.date(byAdding: .day, value: -14, to: Date()) else {
+        return today
+    }
+    let df = DateFormatter()
+    df.dateFormat = "yyyy-MM-dd"
+    let shifts = (try? dataSource.plannedShifts(start: df.string(from: from), end: today)) ?? []
+    return shifts.map(\.date).max() ?? today
+}
+
 func logStore() -> WorkLogStore {
     let dir = (try? store.loadConfig())?.log_dir ?? WorkLogStore.defaultDir
     return WorkLogStore(rootDir: dir)
@@ -260,7 +273,7 @@ case ("log", "append"):
     guard let text = args.positional.first, !text.isEmpty else {
         fail("usage: shiftly log append \"text\" [--date YYYY-MM-DD]", code: 2)
     }
-    let date = args.value("date") ?? todayYMD()
+    let date = args.value("date") ?? activeLogDate()
     let planned = (try? dataSource.plannedShifts(start: date, end: date)) ?? []
     let days = (try? PlannerScriptProvider(root: paths.root).plannedDays(start: date, end: date)) ?? []
     try logStore().append(
@@ -273,14 +286,14 @@ case ("log", "append"):
     emit(["date": date, "path": logStore().resolvedPath(for: date)])
 
 case ("log", "show"):
-    let date = args.value("date") ?? todayYMD()
+    let date = args.value("date") ?? activeLogDate()
     guard let content = logStore().read(date: date) else {
         fail("no log for \(date)", code: 3)
     }
     emit(["date": date, "content": content])
 
 case ("log", "path"):
-    let date = args.value("date") ?? todayYMD()
+    let date = args.value("date") ?? activeLogDate()
     emit(["date": date, "path": logStore().resolvedPath(for: date), "exists": logStore().exists(date: date)])
 
 case ("report", "hours"):

@@ -56,8 +56,11 @@ final class AppModel: ObservableObject {
     @Published var payCurrentMonth: PayBreakdown?
     @Published var logDir: String = (WorkLogStore.defaultDir as NSString).expandingTildeInPath
     @Published var logDirExists = false
-    /// Content of today's log file; nil = not created yet.
+    /// Content of the active daily log (today, or the last workday when
+    /// today has no shift); nil = not created yet.
     @Published var todayLogContent: String?
+    /// Standalone quick notes (`dd-mm-yy | title.md`), newest first.
+    @Published var quickNotes: [WorkLogStore.NoteRef] = []
     /// Days with a log file in the calendar's displayed month.
     @Published var monthLogDates: Set<String> = []
     @Published var logSearchResults: [WorkLogStore.SearchHit] = []
@@ -280,14 +283,24 @@ final class AppModel: ObservableObject {
         WorkLogStore(rootDir: logDir)
     }
 
+    /// The date daily-log entries go to: today when today is a workday,
+    /// otherwise the most recent workday (a Sunday debrief belongs to
+    /// Saturday's shift). Falls back to today before any history exists.
+    var activeLogDate: String {
+        let today = Self.todayYMD()
+        return workHistory.last(where: { $0.ymd <= today })?.ymd ?? today
+    }
+
     func refreshLogState() {
         let configured = (try? store.loadConfig())?.log_dir ?? WorkLogStore.defaultDir
         logDir = (configured as NSString).expandingTildeInPath
         logDirExists = logStore.rootExists
-        todayLogContent = logStore.read(date: Self.todayYMD())
+        todayLogContent = logStore.read(date: activeLogDate)
+        quickNotes = logDirExists ? logStore.notes() : []
     }
 
-    /// Append a timestamped entry to today's log (created on demand).
+    /// Append a timestamped entry to the active daily log (created on
+    /// demand).
     func quickCapture(_ text: String) {
         noteOwnWrite()
         let entry = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -296,8 +309,9 @@ final class AppModel: ObservableObject {
             statusMessage = L("Create the log folder first.")
             return
         }
+        let date = activeLogDate
         Task { @MainActor in
-            guard await ensureTodayLog() != nil else {
+            guard await ensureLog(date: date) != nil else {
                 statusMessage = L("Could not create today's log.")
                 return
             }
@@ -305,12 +319,12 @@ final class AppModel: ObservableObject {
             do {
                 try logStore.append(
                     entry: entry,
-                    date: Self.todayYMD(),
+                    date: date,
                     timeHHMM: hhmm,
                     shift: nil,
                     shiftType: nil
                 )
-                todayLogContent = logStore.read(date: Self.todayYMD())
+                todayLogContent = logStore.read(date: date)
                 statusMessage = L("Logged.")
             } catch {
                 statusMessage = LF("Quick capture failed: %@", error.localizedDescription)
@@ -344,10 +358,9 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Ensure today's log exists (frontmatter pre-filled from the plan) and
+    /// Ensure a day's log exists (frontmatter pre-filled from the plan) and
     /// return its path; nil on failure.
-    func ensureTodayLog() async -> String? {
-        let today = Self.todayYMD()
+    func ensureLog(date: String) async -> String? {
         let syncPaths = paths
         let dir = logDir
         return await Task.detached(priority: .utility) { () -> String? in
@@ -355,12 +368,12 @@ final class AppModel: ObservableObject {
                 store: DataStore(paths: syncPaths),
                 provider: PlannerScriptProvider(root: syncPaths.root)
             )
-            let planned = (try? source.plannedShifts(start: today, end: today)) ?? []
+            let planned = (try? source.plannedShifts(start: date, end: date)) ?? []
             let days = (try? PlannerScriptProvider(root: syncPaths.root)
-                .plannedDays(start: today, end: today)) ?? []
+                .plannedDays(start: date, end: date)) ?? []
             let logStore = WorkLogStore(rootDir: dir)
             return try? logStore.ensureFile(
-                date: today,
+                date: date,
                 shift: planned.first,
                 shiftType: planned.first?.kind == .manual ? "manual" : days.first?.shiftType
             )
@@ -374,13 +387,33 @@ final class AppModel: ObservableObject {
             statusMessage = L("Create the log folder first.")
             return
         }
+        let date = activeLogDate
         Task { @MainActor in
-            if let path = await ensureTodayLog() {
-                todayLogContent = logStore.read(date: Self.todayYMD())
+            if let path = await ensureLog(date: date) {
+                todayLogContent = logStore.read(date: date)
                 NSWorkspace.shared.open(URL(fileURLWithPath: path))
             } else {
                 statusMessage = L("Could not create today's log.")
             }
+        }
+    }
+
+    /// Create a standalone quick note (`dd-mm-yy | title.md`) and open it
+    /// in the default editor.
+    func createQuickNote(title: String) {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard logDirExists else {
+            statusMessage = L("Create the log folder first.")
+            return
+        }
+        noteOwnWrite()
+        do {
+            let path = try logStore.createNote(title: trimmed, date: Self.todayYMD())
+            quickNotes = logStore.notes()
+            NSWorkspace.shared.open(URL(fileURLWithPath: path))
+        } catch {
+            statusMessage = LF("Note create failed: %@", error.localizedDescription)
         }
     }
 
@@ -1023,6 +1056,8 @@ final class AppModel: ObservableObject {
             }.value
             workHistory = result.rows
             workHistoryNote = result.note
+            // The active daily-log date depends on the latest workday.
+            refreshLogState()
         }
     }
 

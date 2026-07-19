@@ -68,9 +68,19 @@ final class DesktopWidgetController {
 /// large continuous corners, material background, no border).
 struct DesktopWidgetView: View {
     @ObservedObject var model: AppModel
+    @State private var showNoteInput = false
+    @State private var noteTitle = ""
 
     private var canStart: Bool {
         !model.routineRunning && !model.enabledRoutineSteps.isEmpty
+    }
+
+    private func submitNote() {
+        let title = noteTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+        model.createQuickNote(title: title)
+        noteTitle = ""
+        showNoteInput = false
     }
 
     var body: some View {
@@ -172,6 +182,32 @@ struct DesktopWidgetView: View {
                 .buttonStyle(.plain)
                 .disabled(model.isBusy)
                 .help(Text("Sync Now"))
+
+                Button {
+                    showNoteInput = true
+                } label: {
+                    Image(systemName: "note.text.badge.plus")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 30, height: 30)
+                        .background(.quaternary, in: Circle())
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .help(Text("Quick note"))
+                .popover(isPresented: $showNoteInput, arrowEdge: .bottom) {
+                    HStack(spacing: 8) {
+                        TextField("Note title", text: $noteTitle)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 180)
+                            .onSubmit { submitNote() }
+                        Button("Create") { submitNote() }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                            .disabled(noteTitle.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                    .padding(10)
+                }
             }
         }
         .padding(16)

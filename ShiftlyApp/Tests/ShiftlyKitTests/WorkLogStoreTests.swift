@@ -99,6 +99,30 @@ private func dayShift(_ date: String) -> PlannedShift {
         #expect(store.datesWithLogs(inMonth: "2026-06").isEmpty)
     }
 
+    @Test func quickNotesRoundTripAndStayApartFromDailyLogs() throws {
+        let dir = tempLogDir()
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        let store = WorkLogStore(rootDir: dir)
+
+        #expect(WorkLogStore.noteFileName(date: "2026-07-19", title: "买工作鞋") == "19-07-26 | 买工作鞋.md")
+        #expect(WorkLogStore.noteFileName(date: "2026-07-19", title: "a/b:c") == "19-07-26 | a-b-c.md",
+                "filesystem-unsafe characters sanitized")
+
+        let path = try store.createNote(title: "买工作鞋", date: "2026-07-19")
+        #expect(path.hasSuffix("/19-07-26 | 买工作鞋.md"))
+        #expect(try store.createNote(title: "买工作鞋", date: "2026-07-19") == path,
+                "same day + title returns the existing note")
+        try store.createNote(title: "roster idea", date: "2026-07-20")
+        try store.ensureFile(date: "2026-07-19", shift: nil, shiftType: nil)
+
+        let notes = store.notes()
+        #expect(notes.map(\.title) == ["roster idea", "买工作鞋"], "newest first")
+        #expect(notes.map(\.date) == ["2026-07-20", "2026-07-19"])
+        #expect(store.allDates() == ["2026-07-19"], "notes never count as daily logs")
+        #expect(store.datesWithLogs(inMonth: "2026-07") == ["2026-07-19"])
+    }
+
     @Test func missingRootReportsNotExists() {
         let store = WorkLogStore(rootDir: tempLogDir())
         #expect(!store.rootExists)

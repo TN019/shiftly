@@ -123,6 +123,67 @@ public struct WorkLogStore {
         public let snippet: String
     }
 
+    // MARK: Quick notes — standalone `dd-mm-yy | title.md` files next to
+    // the daily logs. The date names when the note was taken; the title is
+    // the note. Never confused with daily logs (the " | " marks a note).
+
+    public struct NoteRef: Equatable, Identifiable {
+        public var id: String { path }
+        public let date: String
+        public let title: String
+        public let path: String
+
+        public init(date: String, title: String, path: String) {
+            self.date = date
+            self.title = title
+            self.path = path
+        }
+    }
+
+    /// "2026-07-19" + "买工作鞋" → "19-07-26 | 买工作鞋.md" (filesystem-unsafe
+    /// characters in the title become "-").
+    public static func noteFileName(date: String, title: String) -> String {
+        let safe = title
+            .components(separatedBy: CharacterSet(charactersIn: "/:\\"))
+            .joined(separator: "-")
+            .trimmingCharacters(in: .whitespaces)
+        return "\(fileName(for: date).dropLast(3)) | \(safe).md"
+    }
+
+    /// Create a quick note (frontmatter only, body is the user's) and
+    /// return its path; an existing note of the same day + title is
+    /// returned untouched.
+    @discardableResult
+    public func createNote(title: String, date: String) throws -> String {
+        let path = "\(rootDir)/\(Self.noteFileName(date: date, title: title))"
+        guard !FileManager.default.fileExists(atPath: path) else { return path }
+        try FileManager.default.createDirectory(atPath: rootDir, withIntermediateDirectories: true)
+        let content = "---\ndate: \(date)\ntags: []\n---\n\n"
+        try Data(content.utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
+        return path
+    }
+
+    /// All quick notes, newest date first (title as tiebreaker).
+    public func notes() -> [NoteRef] {
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: rootDir) else {
+            return []
+        }
+        return names.compactMap { name -> NoteRef? in
+            guard name.hasSuffix(".md") else { return nil }
+            let stem = String(name.dropLast(3))
+            guard let sep = stem.range(of: " | "),
+                  let date = Self.date(fromFileName: String(stem[..<sep.lowerBound]) + ".md") else {
+                return nil
+            }
+            return NoteRef(
+                date: date,
+                title: String(stem[sep.upperBound...]),
+                path: "\(rootDir)/\(name)"
+            )
+        }
+        .sorted { ($0.date, $0.title) > ($1.date, $1.title) }
+    }
+
     /// Every day (YYYY-MM-DD) with a log file, across both layouts.
     public func allDates() -> Set<String> {
         let fm = FileManager.default
