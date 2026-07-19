@@ -19,9 +19,34 @@ private func dayShift(_ date: String) -> PlannedShift {
         let store = WorkLogStore(rootDir: dir)
 
         let path = try store.ensureFile(date: "2026-07-17", shift: dayShift("2026-07-17"), shiftType: "day")
-        #expect(path == "\(dir)/2026/2026-07-17.md")
+        #expect(path == "\(dir)/17-07-26.md")
         let content = store.read(date: "2026-07-17")!
         #expect(content.hasPrefix("---\ndate: 2026-07-17\nshift: day\nhours: 8.5\ntags: []\n---\n"))
+    }
+
+    @Test func fileNameMapsToShiftDateBothWays() {
+        #expect(WorkLogStore.fileName(for: "2026-07-19") == "19-07-26.md")
+        #expect(WorkLogStore.date(fromFileName: "19-07-26.md") == "2026-07-19")
+        #expect(WorkLogStore.date(fromFileName: "notes.md") == nil)
+        #expect(WorkLogStore.date(fromFileName: "2026-07-19.md") == nil, "legacy name is not the flat layout")
+    }
+
+    @Test func legacyYearFolderFilesStayReadableAndAppendable() throws {
+        let dir = tempLogDir()
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        try FileManager.default.createDirectory(atPath: dir + "/2026", withIntermediateDirectories: true)
+        let legacy = dir + "/2026/2026-07-17.md"
+        try Data("---\ndate: 2026-07-17\n---\n".utf8).write(to: URL(fileURLWithPath: legacy))
+        let store = WorkLogStore(rootDir: dir)
+
+        #expect(store.exists(date: "2026-07-17"))
+        #expect(store.resolvedPath(for: "2026-07-17") == legacy)
+        try store.append(entry: "still here", date: "2026-07-17", timeHHMM: "09:00",
+                         shift: nil, shiftType: nil)
+        #expect(store.read(date: "2026-07-17")!.hasSuffix("- 09:00 still here\n"))
+        #expect(!FileManager.default.fileExists(atPath: dir + "/17-07-26.md"),
+                "no second file for the same day")
+        #expect(store.datesWithLogs(inMonth: "2026-07") == ["2026-07-17"])
     }
 
     @Test func frontmatterWithoutShift() throws {

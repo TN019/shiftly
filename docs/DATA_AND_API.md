@@ -27,7 +27,7 @@
 | `data/sync_state.json` | **禁止手改**（引擎私有） | 事件映射 |
 | `data/last_sync_report.json` | **禁止手改**（引擎私有） | 最近同步报告 |
 | `data/readback_log.json` | **禁止手改**（引擎私有） | 回读日志（App 内撤销用） |
-| `<log_dir>/YYYY/YYYY-MM-DD.md` | 人 / AI / App | 工作日志（见 §2） |
+| `<log_dir>/dd-mm-yy.md` | 人 / AI / App | 工作日志，一班一文件（见 §2） |
 
 App 的 Settings → Reset 删除上表 `data/` 下的全部 Shiftly 文件并重置应用偏好；
 `data/` 中的非 Shiftly 文件、工作日志与 Apple Calendar 事件一律保留。
@@ -235,7 +235,9 @@ path 打开文件/文件夹（~ 展开）；command 经 `/bin/zsh -lc` 执行（
 
 ## 2. 工作日志
 
-- 位置：`config.log_dir`（缺省 `~/Documents/ShiftlyLogs`），布局 `YYYY/YYYY-MM-DD.md`。
+- 位置：`config.log_dir`（缺省 `~/Documents/ShiftlyLogs`），文件名 `dd-mm-yy.md`
+  平铺（2026-07-19 → `19-07-26.md`，与班次日期一一对应）；旧版 `YYYY/YYYY-MM-DD.md`
+  布局的文件仍可读且续写在原文件（同一天绝不分裂成两个文件）。
 - 新文件自动带 frontmatter；**已存在的文件 Shiftly 只追加、绝不重建**：
 
 ```markdown

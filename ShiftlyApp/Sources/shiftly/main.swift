@@ -270,7 +270,7 @@ case ("log", "append"):
         shift: planned.first,
         shiftType: days.first?.shiftType
     )
-    emit(["date": date, "path": logStore().path(for: date)])
+    emit(["date": date, "path": logStore().resolvedPath(for: date)])
 
 case ("log", "show"):
     let date = args.value("date") ?? todayYMD()
@@ -281,7 +281,7 @@ case ("log", "show"):
 
 case ("log", "path"):
     let date = args.value("date") ?? todayYMD()
-    emit(["date": date, "path": logStore().path(for: date), "exists": logStore().exists(date: date)])
+    emit(["date": date, "path": logStore().resolvedPath(for: date), "exists": logStore().exists(date: date)])
 
 case ("report", "hours"):
     let period = args.value("period") ?? "week"
