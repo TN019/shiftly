@@ -21,17 +21,36 @@ public struct PayConfig: Codable, Equatable {
     public var base_currency: String
     public var rates: [PayRate]
     public var display_rates: [String: Double]
+    /// Unpaid break per shift, subtracted from paid hours (never below 0).
+    public var unpaid_break_minutes: Int
 
     public init(
         version: Int = 1,
         base_currency: String = "AUD",
         rates: [PayRate] = [],
-        display_rates: [String: Double] = ["AUD": 1.0, "CNY": 4.7, "USD": 0.66]
+        display_rates: [String: Double] = ["AUD": 1.0, "CNY": 4.7, "USD": 0.66],
+        unpaid_break_minutes: Int = 0
     ) {
         self.version = version
         self.base_currency = base_currency
         self.rates = rates
         self.display_rates = display_rates
+        self.unpaid_break_minutes = unpaid_break_minutes
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version, base_currency, rates, display_rates, unpaid_break_minutes
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        version = try c.decode(Int.self, forKey: .version)
+        base_currency = try c.decode(String.self, forKey: .base_currency)
+        rates = try c.decode([PayRate].self, forKey: .rates)
+        display_rates = try c.decodeIfPresent([String: Double].self, forKey: .display_rates)
+            ?? ["AUD": 1.0, "CNY": 4.7, "USD": 0.66]
+        // Files written before the field existed read as "no break".
+        unpaid_break_minutes = try c.decodeIfPresent(Int.self, forKey: .unpaid_break_minutes) ?? 0
     }
 
     /// The hourly rate applicable on a date, nil before the first segment.

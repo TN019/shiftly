@@ -50,6 +50,7 @@ struct ContentView: View {
     @State var paySetupHourly = ""
     @State var paySetupDate = Date()
     @State var payNewRate = ""
+    @State var payBreakMinutes = ""
     @State var payNewRateDate = Date()
     @State var payExchangeEdits: [String: String] = [:]
     @AppStorage("shiftly.payDisplayCurrency") var payDisplayCurrency = "AUD"

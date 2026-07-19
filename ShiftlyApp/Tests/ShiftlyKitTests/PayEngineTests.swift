@@ -56,6 +56,35 @@ private func shift(_ date: String, _ start: String = "10:00", _ end: String = "1
         #expect(!breakdown.hasUnratedShifts)
     }
 
+    @Test func unpaidBreakComesOffEveryShift() {
+        // 10:00–18:30 with a 30 min unpaid break pays 8h, not 8.5h.
+        var withBreak = config
+        withBreak.unpaid_break_minutes = 30
+        let breakdown = PayEngine.breakdown(
+            shifts: [shift("2026-07-06"), shift("2026-07-07")],
+            config: withBreak
+        )
+        #expect(abs(breakdown.totalHours - 16.0) < 0.001)
+        #expect(abs(breakdown.totalAmount - 480.0) < 0.001)
+    }
+
+    @Test func breakLongerThanShiftFloorsAtZero() {
+        var withBreak = config
+        withBreak.unpaid_break_minutes = 45
+        let breakdown = PayEngine.breakdown(
+            shifts: [shift("2026-07-06", "10:00", "10:30")],
+            config: withBreak
+        )
+        #expect(breakdown.items[0].hours == 0)
+        #expect(breakdown.totalAmount == 0)
+    }
+
+    @Test func legacyPayFileWithoutBreakFieldReadsAsZero() throws {
+        let json = #"{"version":1,"base_currency":"AUD","rates":[{"effective_from":"2026-01-01","hourly":30}],"display_rates":{"AUD":1.0}}"#
+        let config = try JSONDecoder().decode(PayConfig.self, from: Data(json.utf8))
+        #expect(config.unpaid_break_minutes == 0)
+    }
+
     @Test func overnightShiftCountsFullHours() {
         // 22:00–06:00 = 8h, attributed to the start day.
         let breakdown = PayEngine.breakdown(

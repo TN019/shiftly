@@ -450,6 +450,12 @@ final class AppModel: ObservableObject {
         savePay(config, successMessage: L("Rate saved."))
     }
 
+    func setUnpaidBreak(minutes: Int) {
+        guard var config = payConfig else { return }
+        config.unpaid_break_minutes = max(0, minutes)
+        savePay(config, successMessage: L("Unpaid break saved."))
+    }
+
     func updateDisplayRates(_ rates: [String: Double]) {
         guard var config = payConfig else { return }
         config.display_rates = rates

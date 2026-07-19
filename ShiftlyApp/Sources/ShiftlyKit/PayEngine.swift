@@ -35,7 +35,10 @@ public enum PayEngine {
     public static func breakdown(shifts: [PlannedShift], config: PayConfig) -> PayBreakdown {
         var result = PayBreakdown()
         for shift in shifts.sorted(by: { $0.date < $1.date }) {
-            let hours = shift.end.timeIntervalSince(shift.start) / 3600
+            let span = shift.end.timeIntervalSince(shift.start) / 3600
+            // Paid hours: the unpaid break comes off every shift, but a
+            // shift shorter than the break just pays nothing extra-negative.
+            let hours = max(0, span - Double(config.unpaid_break_minutes) / 60)
             let rate = config.hourlyRate(on: shift.date)
             let amount = (rate ?? 0) * hours
             if rate == nil {

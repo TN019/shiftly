@@ -173,6 +173,28 @@ extension ContentView {
             Text("A raise is a new segment; earlier months keep using the rate that applied back then.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
+            Divider()
+            HStack(spacing: 10) {
+                Text("Unpaid break").font(.caption).foregroundStyle(.secondary)
+                TextField("30", text: $payBreakMinutes)
+                    .frame(width: 60)
+                Text("min / shift").font(.caption).foregroundStyle(.secondary)
+                Button("Save") {
+                    if let minutes = Int(payBreakMinutes), minutes >= 0 {
+                        model.setUnpaidBreak(minutes: minutes)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(Int(payBreakMinutes) == nil || Int(payBreakMinutes)! < 0
+                          || Int(payBreakMinutes) == config.unpaid_break_minutes)
+                Spacer(minLength: 0)
+            }
+            .onAppear {
+                payBreakMinutes = String(config.unpaid_break_minutes)
+            }
+            Text("Subtracted from every shift's paid hours — e.g. 10:00–18:30 with a 30 min break pays 8 h.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
     }
 
