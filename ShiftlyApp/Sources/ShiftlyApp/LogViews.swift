@@ -168,7 +168,7 @@ extension ContentView {
             }
             .labelsHidden()
             .pickerStyle(.segmented)
-            .frame(maxWidth: 320)
+            .frame(maxWidth: .infinity)
 
             if logsListShowsNotes {
                 if notes.isEmpty {
