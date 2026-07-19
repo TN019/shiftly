@@ -68,16 +68,21 @@ extension ContentView {
                 Spacer(minLength: 0)
             }
 
-            if upcomingHolidays.isEmpty && pastHolidays.isEmpty {
+            HStack(spacing: 8) {
+                Text("Upcoming")
+                    .font(.subheadline.weight(.medium))
+                Text("(\(upcomingHolidays.count))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+            }
+            .padding(.top, 2)
+            if upcomingHolidays.isEmpty {
                 Text("None")
                     .font(.subheadline)
                     .foregroundStyle(.tertiary)
                     .italic()
-            }
-            if !upcomingHolidays.isEmpty {
-                Text("Upcoming")
-                    .font(.subheadline.weight(.medium))
-                    .padding(.top, 2)
+            } else {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(upcomingHolidays) { item in
                         holidayRow(item: item)

@@ -93,42 +93,49 @@ extension ContentView {
         past: [OverrideRowData],
         pastExpanded: Binding<Bool>
     ) -> some View {
-        if upcoming.isEmpty && past.isEmpty {
+        HStack(spacing: 8) {
+            Text("Upcoming")
+                .font(.subheadline.weight(.medium))
+            Text("(\(upcoming.count))")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+        }
+        .padding(.top, 2)
+        if upcoming.isEmpty {
             Text("None")
                 .font(.subheadline)
                 .foregroundStyle(.tertiary)
                 .italic()
         } else {
-            if !upcoming.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(upcoming) { row in
-                        overrideRow(row)
-                    }
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(upcoming) { row in
+                    overrideRow(row)
                 }
             }
-            if !past.isEmpty {
-                DisclosureGroup(isExpanded: pastExpanded) {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(past) { row in
-                                overrideRow(row)
-                            }
+        }
+        if !past.isEmpty {
+            DisclosureGroup(isExpanded: pastExpanded) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(past) { row in
+                            overrideRow(row)
                         }
-                        .padding(.vertical, 6)
                     }
-                    .frame(maxHeight: 220)
-                } label: {
-                    HStack(spacing: 8) {
-                        Text("Past")
-                            .font(.subheadline.weight(.medium))
-                        Text("(\(past.count))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer(minLength: 0)
-                    }
+                    .padding(.vertical, 6)
                 }
-                .padding(.top, 2)
+                .frame(maxHeight: 220)
+            } label: {
+                HStack(spacing: 8) {
+                    Text("Past")
+                        .font(.subheadline.weight(.medium))
+                    Text("(\(past.count))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                }
             }
+            .padding(.top, 2)
         }
     }
 
