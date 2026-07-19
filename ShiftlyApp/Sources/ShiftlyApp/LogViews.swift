@@ -162,13 +162,15 @@ extension ContentView {
                 uniquingKeysWith: { a, _ in a }
             )
 
-            Picker("", selection: $logsListShowsNotes) {
-                Text(LF("Daily Logs (%lld)", logDates.count)).tag(false)
-                Text(LF("Quick Notes (%lld)", notes.count)).tag(true)
+            HStack(spacing: 4) {
+                logsSegment(LF("Daily Logs (%lld)", logDates.count), showsNotes: false)
+                logsSegment(LF("Quick Notes (%lld)", notes.count), showsNotes: true)
             }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .frame(maxWidth: .infinity)
+            .padding(3)
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(Color.primary.opacity(0.06))
+            )
 
             if logsListShowsNotes {
                 if notes.isEmpty {
@@ -202,6 +204,28 @@ extension ContentView {
                 }
             }
         }
+    }
+
+    /// Full-width segmented button (the native segmented picker never
+    /// stretches on macOS, so it cannot line up with the search field).
+    private func logsSegment(_ title: String, showsNotes: Bool) -> some View {
+        Button {
+            logsListShowsNotes = showsNotes
+        } label: {
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(logsListShowsNotes == showsNotes
+                              ? Color.accentColor
+                              : Color.clear)
+                )
+                .foregroundStyle(logsListShowsNotes == showsNotes ? Color.white : Color.primary)
+                .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
