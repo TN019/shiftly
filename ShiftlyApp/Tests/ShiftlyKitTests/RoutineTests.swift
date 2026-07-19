@@ -20,7 +20,8 @@ private final class CallLog: @unchecked Sendable {
         let shells = CallLog()
         let runner = RoutineRunner(
             openExecutor: { args in opens.record(args); return (true, nil) },
-            shellExecutor: { args in shells.record(args); return (true, nil) }
+            shellExecutor: { args in shells.record(args); return (true, nil) },
+            appSearchPaths: []
         )
         let results = runner.run([
             RoutineStep(kind: "app", value: "DingTalk"),
@@ -40,7 +41,8 @@ private final class CallLog: @unchecked Sendable {
         let opens = CallLog()
         let runner = RoutineRunner(
             openExecutor: { args in opens.record(args); return (true, nil) },
-            shellExecutor: { _ in (true, nil) }
+            shellExecutor: { _ in (true, nil) },
+            appSearchPaths: []
         )
         _ = runner.runStep(RoutineStep(
             kind: "app", value: "Ghostty", args: ["--working-directory=/Users/me/work"]
@@ -52,7 +54,8 @@ private final class CallLog: @unchecked Sendable {
         let opens = CallLog()
         let runner = RoutineRunner(
             openExecutor: { args in opens.record(args); return (true, nil) },
-            shellExecutor: { _ in (true, nil) }
+            shellExecutor: { _ in (true, nil) },
+            appSearchPaths: []
         )
         let results = runner.run([
             RoutineStep(kind: "url", value: "ftp://nope"),          // invalid scheme
@@ -67,6 +70,34 @@ private final class CallLog: @unchecked Sendable {
         #expect(opens.calls == [["-a", "DingTalk"]])
     }
 
+    @Test func appNameResolvesAgainstInstalledBundles() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("apps_\(UUID().uuidString)").path
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        for app in ["DingTalkLite.app", "WeChat.app", "Anki.app"] {
+            try FileManager.default.createDirectory(
+                atPath: "\(dir)/\(app)", withIntermediateDirectories: true
+            )
+        }
+        // Exact install: name passes through.
+        #expect(RoutineRunner.resolvedAppName("WeChat", searchPaths: [dir]) == "WeChat")
+        // Product name vs bundle name: prefix match wins (the user's case).
+        #expect(RoutineRunner.resolvedAppName("DingTalk", searchPaths: [dir]) == "DingTalkLite")
+        // Case-insensitive contains as a last resort.
+        #expect(RoutineRunner.resolvedAppName("talk", searchPaths: [dir]) == "DingTalkLite")
+        // No match: unchanged, so `open` reports the honest error.
+        #expect(RoutineRunner.resolvedAppName("Slack", searchPaths: [dir]) == "Slack")
+        // The runner passes the resolved name to `open -a`.
+        let opens = CallLog()
+        let runner = RoutineRunner(
+            openExecutor: { args in opens.record(args); return (true, nil) },
+            shellExecutor: { _ in (true, nil) },
+            appSearchPaths: [dir]
+        )
+        _ = runner.runStep(RoutineStep(kind: "app", value: "DingTalk"))
+        #expect(opens.calls == [["-a", "DingTalkLite"]])
+    }
+
     @Test func pathStepExpandsTildeAndOpensExisting() throws {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("routine_\(UUID().uuidString)").path
@@ -75,7 +106,8 @@ private final class CallLog: @unchecked Sendable {
         let opens = CallLog()
         let runner = RoutineRunner(
             openExecutor: { args in opens.record(args); return (true, nil) },
-            shellExecutor: { _ in (true, nil) }
+            shellExecutor: { _ in (true, nil) },
+            appSearchPaths: []
         )
         let result = runner.runStep(RoutineStep(kind: "path", value: dir))
         #expect(result.success)
