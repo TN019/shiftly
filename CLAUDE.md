@@ -5,7 +5,9 @@
 **Shiftly**（旧名 Shifty）：本地优先的 macOS **排班 + 工资 + Markdown 工作日志**
 三合一应用，与 Apple Calendar 双向同步（EventKit，回读+撤销）。
 不做网站部署；日常使用零终端（双击 .app，登录自启 + 自动同步）。
-**v2 规划（M1–M6，31 张卡）已于 2026-07-17 全部完成，当前版本 v0.7.0。**
+**v2 规划（M1–M6，31 张卡）已于 2026-07-17 全部完成（v0.7.0）；v0.8 开发中：
+一键上班 routine、历史导入、公共假期、无薪休息、日志/笔记体系（应用内编辑器）、
+Meetings（录音 + Scripto 转录）、原生 WidgetKit 组件（深链按钮）、标准存储布局。**
 
 ## Git / PR 约定
 
@@ -46,10 +48,16 @@
 ```
 ShiftlyApp/Sources/ShiftlyKit/           领域核心（无 UI 依赖）：模型、同步引擎
                                          （SyncEngine/Coordinator/EKCalendarStore）、
-                                         工资（PayEngine）、日志（WorkLogStore）、
+                                         工资（PayEngine）、日志与笔记（WorkLogStore）、
+                                         会议（Meetings/SRT）、导入（HistoryImporter）、
+                                         存储（StorageLayout/DataReset）、Routine、
                                          FolderWatcher、DataStore/ConfigLogic
-ShiftlyApp/Sources/ShiftlyApp/           GUI：五区导航（今日/日历/工资/日志/设置）、
-                                         月历、规则管理、菜单栏、通知
+ShiftlyApp/Sources/ShiftlyApp/           GUI：七区导航（今日/排班/日历/工资/日志/
+                                         会议/设置）、月历、规则管理、菜单栏、通知、
+                                         应用内 Markdown 编辑窗、会议播放窗
+ShiftlyApp/Widgets/                      WidgetKit 组件源（build_app.sh 用 swiftc
+                                         打进 PlugIns/ShiftlyWidgets.appex；入口
+                                         必须 -e _NSExtensionMain + sandbox 签名）
 ShiftlyApp/Sources/shiftly/              CLI（JSON 输出，AI/脚本入口）
 ShiftlyApp/Tests/ShiftlyKitTests/        Swift Testing（74 用例；本机只有 CLT，
                                          跑法见 scripts/test.sh）

@@ -60,9 +60,13 @@ scripts/build_app.sh          # → dist/Shiftly.app
 
 Move `dist/Shiftly.app` to `/Applications` (or anywhere) and double-click.
 
-**First run:** the app asks for a **data folder** (a starter `data/config.json` is created if the folder is empty; an existing Shiftly data folder is picked up as is). Set the weekly schedule, press **Sync Now** — macOS asks for Calendar access on the first sync. The chosen folder is remembered; the `SHIFTLY_ROOT` environment variable still wins when set.
+**First run:** the app asks for a **storage folder** and provisions the standard layout under it — `app/data` (the data root), `app/meetings`, `logs`, `notes` — writing the absolute paths into `config.json`; a folder that already is a data root (its `data/config.json` exists) is adopted as is. Each location can be relocated later from **Settings → Storage**: a change *moves* the existing content and leaves nothing behind. Set the weekly schedule, press **Sync Now** — macOS asks for Calendar access on the first sync. The chosen folder is remembered; the `SHIFTLY_ROOT` environment variable still wins when set.
 
 The Python helper scripts are bundled into the app, so no repo checkout is needed at the data folder (a `scripts/` directory at the data root takes precedence when present).
+
+**Desktop widgets:** `build_app.sh` also compiles a WidgetKit extension into `Contents/PlugIns/ShiftlyWidgets.appex` with plain `swiftc` — no Xcode. Three things make a hand-built appex loadable: the **`com.apple.security.app-sandbox` entitlement** (WidgetKit refuses unsandboxed extensions), `CFBundleSupportedPlatforms = [MacOSX]`, and linking with **`-e _NSExtensionMain`** (a plain Swift `@main` entry dies with "Unrecognized extension type"). The app feeds the widgets by writing a snapshot JSON into the `group.com.shiftly.app` container and calling `WidgetCenter.reloadAllTimelines()`. Add the widgets via right-click on the desktop → Edit Widgets → search "Shiftly"; the chips deep-link back through the `shiftly://` URL scheme (`start-work`, `meetings`, `new-note`, `open`).
+
+**Meetings / Scripto:** recordings land in `<meetings_dir>/dd-mm-yy | hh-mm/dd-mm-yy.mp4` (AAC). Transcribe / Translate run [Scripto](https://github.com/TN019/scripto) headlessly via `uv run scripto-cli run <audio> --format srt [--translate --target zh|en]`; point **Settings → Meetings → Scripto folder** at your Scripto checkout (the folder with `pyproject.toml`). Subtitles (`*.en.srt`, `*.zh.srt`) land next to each recording and play back inside the app with cue highlighting. Translation additionally needs a local Ollama, per Scripto's own requirements.
 
 **Scheduled sync:** the in-app **Auto-sync** setting (hourly / 6h / 12h / daily) syncs while the app is open; enable **Launch at login** so it resumes after a reboot. For syncing without the app running, use the [launchd template](#scheduled-sync-launchagent) instead — the two approaches are independent.
 
