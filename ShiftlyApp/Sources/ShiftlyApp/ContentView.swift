@@ -2,7 +2,7 @@ import ShiftlyKit
 import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable {
-    case today, shift, calendar, pay, log, settings
+    case today, shift, calendar, pay, log, meetings, settings
 
     var id: String { rawValue }
 
@@ -13,6 +13,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .calendar: return "Calendar"
         case .pay: return "Pay"
         case .log: return "Log"
+        case .meetings: return "Meetings"
         case .settings: return "Settings"
         }
     }
@@ -24,6 +25,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .calendar: return "calendar"
         case .pay: return "dollarsign.circle"
         case .log: return "text.book.closed"
+        case .meetings: return "mic"
         case .settings: return "gearshape"
         }
     }
@@ -201,6 +203,7 @@ struct ContentView: View {
                 case .calendar: calendarPage
                 case .pay: payPage
                 case .log: logPage
+                case .meetings: meetingsPage
                 case .settings: settingsPage
                 }
                 if !model.statusMessage.isEmpty {
@@ -634,6 +637,46 @@ struct ContentView: View {
                     .buttonStyle(.bordered)
             }
             Text("New logs go to the new folder; existing files are neither moved nor deleted.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+
+        card("Meetings") {
+            HStack(spacing: 10) {
+                Text("Recordings folder").font(.caption).foregroundStyle(.secondary)
+                Text(model.meetingsDir)
+                    .font(.system(.caption, design: .monospaced))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 0)
+                Button("Change…") { chooseMeetingsFolder() }
+                    .buttonStyle(.bordered)
+            }
+            HStack(spacing: 10) {
+                Text("Scripto folder").font(.caption).foregroundStyle(.secondary)
+                Text(model.scriptoDir.isEmpty ? L("Not set") : model.scriptoDir)
+                    .font(.system(.caption, design: .monospaced))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 0)
+                Button("Change…") { chooseScriptoFolder() }
+                    .buttonStyle(.bordered)
+            }
+            HStack(spacing: 10) {
+                Text("Translate to").font(.caption).foregroundStyle(.secondary)
+                Picker("", selection: Binding(
+                    get: { model.translateTarget },
+                    set: { model.setTranslateTarget($0) }
+                )) {
+                    Text("中文").tag("zh")
+                    Text("English").tag("en")
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 110)
+                Spacer(minLength: 0)
+            }
+            Text("Transcribe / Translate run Scripto's CLI headlessly (uv run scripto-cli); subtitles land next to each recording.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }

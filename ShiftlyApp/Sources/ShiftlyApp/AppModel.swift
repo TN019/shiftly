@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import EventKit
 import Foundation
 import ServiceManagement
@@ -79,6 +80,17 @@ final class AppModel: ObservableObject {
     /// Calendars available for history import (id, title).
     @Published var importCalendars: [ImportCalendar] = []
     @Published var importRunning = false
+    /// Meeting recordings + Scripto integration.
+    @Published var meetings: [MeetingStore.Meeting] = []
+    @Published var meetingsDir: String = (MeetingStore.defaultDir as NSString).expandingTildeInPath
+    @Published var scriptoDir: String = ""
+    @Published var translateTarget: String = "zh"
+    @Published var isRecording = false
+    @Published var recordingSeconds = 0
+    /// Meeting folders with a Scripto run in flight.
+    @Published var scriptoBusy: Set<String> = []
+    private var audioRecorder: AVAudioRecorder?
+    private var recordTimer: Timer?
 
     struct ImportCalendar: Identifiable, Equatable {
         let id: String
@@ -229,6 +241,7 @@ final class AppModel: ObservableObject {
         refreshPayMonth()
         refreshLogState()
         routine = store.loadRoutine()
+        refreshMeetings()
         if watcher == nil {
             startWatching()
         }
@@ -417,6 +430,177 @@ final class AppModel: ObservableObject {
             } else {
                 statusMessage = L("Could not create today's log.")
             }
+        }
+    }
+
+    // MARK: Meetings
+
+    var meetingStore: MeetingStore { MeetingStore(rootDir: meetingsDir) }
+
+    func refreshMeetings() {
+        let config = try? store.loadConfig()
+        meetingsDir = config?.meetingsRoot ?? (MeetingStore.defaultDir as NSString).expandingTildeInPath
+        scriptoDir = config?.scripto_dir ?? ""
+        translateTarget = config?.translate_target ?? "zh"
+        meetings = meetingStore.meetings()
+    }
+
+    func adoptMeetingsDir(_ url: URL) {
+        noteOwnWrite()
+        do {
+            try store.saveMeetingSetting(key: "meetings_dir", value: url.path)
+            refreshMeetings()
+            statusMessage = L("Meetings folder updated.")
+        } catch {
+            statusMessage = LF("Save failed: %@", error.localizedDescription)
+        }
+    }
+
+    func adoptScriptoDir(_ url: URL) {
+        noteOwnWrite()
+        do {
+            try store.saveMeetingSetting(key: "scripto_dir", value: url.path)
+            refreshMeetings()
+            statusMessage = L("Scripto folder saved.")
+        } catch {
+            statusMessage = LF("Save failed: %@", error.localizedDescription)
+        }
+    }
+
+    func setTranslateTarget(_ target: String) {
+        noteOwnWrite()
+        try? store.saveMeetingSetting(key: "translate_target", value: target)
+        translateTarget = target
+    }
+
+    /// Start a meeting recording (AAC mono into the timestamped folder).
+    func startRecording() {
+        guard !isRecording else { return }
+        AVCaptureDevice.requestAccess(for: .audio) { granted in
+            Task { @MainActor in
+                guard granted else {
+                    self.statusMessage = L("Microphone access denied. Grant it in System Settings → Privacy & Security → Microphone.")
+                    return
+                }
+                self.beginRecording()
+            }
+        }
+    }
+
+    private func beginRecording() {
+        let now = Date()
+        let df = DateFormatter()
+        df.dateFormat = "HH:mm"
+        do {
+            let path = try meetingStore.newRecordingPath(
+                date: Self.todayYMD(), timeHHMM: df.string(from: now)
+            )
+            let recorder = try AVAudioRecorder(
+                url: URL(fileURLWithPath: path),
+                settings: [
+                    AVFormatIDKey: kAudioFormatMPEG4AAC,
+                    AVSampleRateKey: 44_100,
+                    AVNumberOfChannelsKey: 1,
+                    AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
+                ]
+            )
+            guard recorder.record() else {
+                statusMessage = L("Could not start recording.")
+                return
+            }
+            audioRecorder = recorder
+            isRecording = true
+            recordingSeconds = 0
+            recordTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    guard let self, self.isRecording else { return }
+                    self.recordingSeconds += 1
+                }
+            }
+            statusMessage = L("Recording…")
+        } catch {
+            statusMessage = LF("Could not start recording: %@", error.localizedDescription)
+        }
+    }
+
+    func stopRecording() {
+        guard isRecording else { return }
+        audioRecorder?.stop()
+        audioRecorder = nil
+        recordTimer?.invalidate()
+        recordTimer = nil
+        isRecording = false
+        refreshMeetings()
+        statusMessage = L("Recording saved.")
+    }
+
+    /// Run Scripto headlessly on a meeting's audio; the SRT lands next to
+    /// the recording and the list refreshes when the run finishes.
+    func runScripto(meeting: MeetingStore.Meeting, translate: Bool) {
+        guard let audio = meeting.audioPath else {
+            statusMessage = L("No recording in this meeting folder.")
+            return
+        }
+        let scripto = (scriptoDir as NSString).expandingTildeInPath
+        guard !scripto.isEmpty,
+              FileManager.default.fileExists(atPath: scripto + "/pyproject.toml") else {
+            statusMessage = L("Set the Scripto folder in Settings first.")
+            return
+        }
+        guard !scriptoBusy.contains(meeting.folder) else { return }
+        scriptoBusy.insert(meeting.folder)
+        statusMessage = translate ? L("Translating…") : L("Transcribing…")
+        let target = translateTarget
+        Task { @MainActor in
+            let result = await Task.detached(priority: .userInitiated) { () -> (ok: Bool, message: String) in
+                var command = "cd \(Self.shellQuote(scripto)) && uv run scripto-cli run \(Self.shellQuote(audio)) --format srt"
+                if translate {
+                    command += " --translate --target \(target)"
+                }
+                let proc = Process()
+                proc.executableURL = URL(fileURLWithPath: "/bin/zsh")
+                proc.arguments = ["-lc", command]
+                let errPipe = Pipe()
+                proc.standardError = errPipe
+                proc.standardOutput = Pipe()
+                do {
+                    try proc.run()
+                    proc.waitUntilExit()
+                    if proc.terminationStatus == 0 {
+                        return (true, "")
+                    }
+                    let err = String(
+                        data: errPipe.fileHandleForReading.readDataToEndOfFile(),
+                        encoding: .utf8
+                    )?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    return (false, err.split(separator: "\n").last.map(String.init) ?? "exit \(proc.terminationStatus)")
+                } catch {
+                    return (false, error.localizedDescription)
+                }
+            }.value
+            scriptoBusy.remove(meeting.folder)
+            refreshMeetings()
+            statusMessage = result.ok
+                ? (translate ? L("Translation ready.") : L("Transcript ready."))
+                : LF("Scripto failed: %@", result.message)
+        }
+    }
+
+    /// Single-quote a string for /bin/zsh -lc.
+    nonisolated static func shellQuote(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    func deleteMeeting(_ meeting: MeetingStore.Meeting) {
+        noteOwnWrite()
+        do {
+            try FileManager.default.trashItem(
+                at: URL(fileURLWithPath: meeting.folder), resultingItemURL: nil
+            )
+            refreshMeetings()
+            statusMessage = L("Meeting moved to Trash.")
+        } catch {
+            statusMessage = LF("Delete failed: %@", error.localizedDescription)
         }
     }
 

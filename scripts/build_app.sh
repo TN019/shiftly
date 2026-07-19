@@ -62,6 +62,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <string>Shiftly keeps your Shifts calendar in sync with your work schedule: it creates shift events and reads back changes you make in Calendar.</string>
   <key>NSCalendarsUsageDescription</key>
   <string>Shiftly keeps your Shifts calendar in sync with your work schedule.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Shiftly records meeting audio into your meetings folder when you press Record.</string>
 </dict>
 </plist>
 PLIST
