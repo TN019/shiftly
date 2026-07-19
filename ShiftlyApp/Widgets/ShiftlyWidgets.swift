@@ -192,6 +192,8 @@ struct ShiftlyWidgetView: View {
             }
         }
         .containerBackground(.background, for: .widget)
+        // Clicking anywhere outside the chips opens Shiftly itself.
+        .widgetURL(URL(string: "shiftly://open"))
     }
 }
 

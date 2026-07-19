@@ -646,7 +646,7 @@ final class AppModel: ObservableObject {
         case "new-note":
             newQuickNote()
         default:
-            break
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 
