@@ -28,6 +28,7 @@
 | `data/last_sync_report.json` | **禁止手改**（引擎私有） | 最近同步报告 |
 | `data/readback_log.json` | **禁止手改**（引擎私有） | 回读日志（App 内撤销用） |
 | `<log_dir>/dd-mm-yy.md` | 人 / AI / App | 工作日志，一班一文件（见 §2） |
+| `<meetings_dir>/dd-mm-yy \| hh-mm/` | 人 / App / Scripto | 会议：录音 `dd-mm-yy.mp4` + Scripto 字幕 `*.{en,zh}.srt`（见 §2.5） |
 
 App 的 Settings → Reset 删除上表 `data/` 下的全部 Shiftly 文件并重置应用偏好；
 `data/` 中的非 Shiftly 文件、工作日志与 Apple Calendar 事件一律保留。
@@ -258,6 +259,16 @@ tags: []
 ```
 
 - 正文是自由 Markdown，任何编辑器可改；App 的搜索会命中 frontmatter 与正文。
+
+### 2.5 会议（Meetings）
+
+- 目录：`config.meetings_dir`（缺省 `~/Documents/ShiftlyMeetings`）。每次录音生成
+  `dd-mm-yy | hh-mm/`（开始时间戳；macOS 文件名冒号保留，故用 `hh-mm`），
+  内含录音 `dd-mm-yy.mp4`（AAC）。
+- 转录/翻译由 App 无界面调用 Scripto：`cd <config.scripto_dir> && uv run scripto-cli
+  run <音频> --format srt [--translate --target <config.translate_target|zh>]`；
+  字幕 `<名>.<lang>.srt` 由 Scripto 写在录音旁，App 只读——列表、播放与按时间戳
+  高亮均在 App 内完成。
 
 ## 3. `shiftly` CLI 参考
 

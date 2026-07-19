@@ -44,6 +44,12 @@ public struct Config: Codable {
     public var log_dir: String?
     /// Quick-notes folder; nil = "<log_dir>/notes".
     public var notes_dir: String?
+    /// Meeting recordings folder; nil = MeetingStore.defaultDir.
+    public var meetings_dir: String?
+    /// Scripto checkout used for transcription; nil = not configured.
+    public var scripto_dir: String?
+    /// Scripto translation target ("zh"/"en"); nil = "zh".
+    public var translate_target: String?
 
     /// Times for a shift-type id: matching type, else config defaults.
     public func times(forShiftType id: String?) -> (start: String, end: String) {

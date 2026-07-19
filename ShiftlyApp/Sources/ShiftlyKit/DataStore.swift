@@ -117,6 +117,14 @@ public struct DataStore {
         try ConfigLogic.writeRawConfig(raw, toPath: paths.configPath)
     }
 
+    /// Merge one meetings-related setting into config.json.
+    public func saveMeetingSetting(key: String, value: String) throws {
+        precondition(["meetings_dir", "scripto_dir", "translate_target"].contains(key))
+        var raw = try ConfigLogic.readRawConfig(atPath: paths.configPath)
+        raw[key] = value
+        try ConfigLogic.writeRawConfig(raw, toPath: paths.configPath)
+    }
+
     /// Merge calendar name/title into config.json (unknown keys preserved).
     public func saveCalendarSettings(calendarName: String, eventTitle: String) throws {
         let raw = try ConfigLogic.readRawConfig(atPath: paths.configPath)
