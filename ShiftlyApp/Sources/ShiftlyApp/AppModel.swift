@@ -55,6 +55,7 @@ final class AppModel: ObservableObject {
     @Published var payConfig: PayConfig?
     @Published var payCurrentMonth: PayBreakdown?
     @Published var logDir: String = (WorkLogStore.defaultDir as NSString).expandingTildeInPath
+    @Published var notesDir: String = (WorkLogStore.defaultDir as NSString).expandingTildeInPath + "/notes"
     @Published var logDirExists = false
     /// Content of the active daily log (today, or the last workday when
     /// today has no shift); nil = not created yet.
@@ -110,7 +111,7 @@ final class AppModel: ObservableObject {
     func startWatching() {
         watcher?.stop()
         guard paths.isValid else { return }
-        watcher = FolderWatcher(paths: ["\(paths.root)/data", logDir]) { [weak self] changed in
+        watcher = FolderWatcher(paths: ["\(paths.root)/data", logDir, notesDir]) { [weak self] changed in
             Task { @MainActor [weak self] in
                 self?.handleExternalChange(changed)
             }
@@ -283,7 +284,7 @@ final class AppModel: ObservableObject {
     // MARK: Work log
 
     var logStore: WorkLogStore {
-        WorkLogStore(rootDir: logDir)
+        WorkLogStore(rootDir: logDir, notesDir: notesDir)
     }
 
     /// The date daily-log entries go to: today when today is a workday,
@@ -295,8 +296,10 @@ final class AppModel: ObservableObject {
     }
 
     func refreshLogState() {
-        let configured = (try? store.loadConfig())?.log_dir ?? WorkLogStore.defaultDir
+        let config = try? store.loadConfig()
+        let configured = config?.log_dir ?? WorkLogStore.defaultDir
         logDir = (configured as NSString).expandingTildeInPath
+        notesDir = ((config?.notes_dir ?? logDir + "/notes") as NSString).expandingTildeInPath
         logDirExists = logStore.rootExists
         todayLogContent = logStore.read(date: activeLogDate)
         quickNotes = logDirExists ? logStore.notes() : []
@@ -359,6 +362,20 @@ final class AppModel: ObservableObject {
             statusMessage = L("Log folder updated. Existing logs stay in the old folder.")
         } catch {
             statusMessage = LF("Could not save log folder: %@", error.localizedDescription)
+        }
+    }
+
+    /// Point config at a different quick-notes folder. Existing files are
+    /// neither moved nor deleted.
+    func adoptNotesDir(_ url: URL) {
+        noteOwnWrite()
+        do {
+            try store.saveNotesDir(url.path)
+            refreshLogState()
+            startWatching()
+            statusMessage = L("Notes folder updated. Existing notes stay in the old folder.")
+        } catch {
+            statusMessage = LF("Could not save notes folder: %@", error.localizedDescription)
         }
     }
 

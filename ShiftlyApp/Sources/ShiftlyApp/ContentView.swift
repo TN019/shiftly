@@ -638,6 +638,22 @@ struct ContentView: View {
                 .foregroundStyle(.tertiary)
         }
 
+        card("Quick Notes Folder") {
+            HStack(spacing: 10) {
+                Text(model.notesDir)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 0)
+                Button("Change…") { chooseNotesFolder() }
+                    .buttonStyle(.bordered)
+            }
+            Text("New notes go to the new folder; existing files are neither moved nor deleted.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+
         card("Reset") {
             Text("Erase all Shiftly data — schedule, overrides, imported history, pay, routine and sync state — and start over from the welcome screen. Apple Calendar events and work log files are not touched.")
                 .font(.caption)

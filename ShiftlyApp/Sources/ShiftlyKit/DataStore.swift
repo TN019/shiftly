@@ -110,6 +110,13 @@ public struct DataStore {
         try ConfigLogic.writeRawConfig(raw, toPath: paths.configPath)
     }
 
+    /// Set the quick-notes folder in config.json (unknown keys preserved).
+    public func saveNotesDir(_ dir: String) throws {
+        var raw = try ConfigLogic.readRawConfig(atPath: paths.configPath)
+        raw["notes_dir"] = dir
+        try ConfigLogic.writeRawConfig(raw, toPath: paths.configPath)
+    }
+
     /// Merge calendar name/title into config.json (unknown keys preserved).
     public func saveCalendarSettings(calendarName: String, eventTitle: String) throws {
         let raw = try ConfigLogic.readRawConfig(atPath: paths.configPath)

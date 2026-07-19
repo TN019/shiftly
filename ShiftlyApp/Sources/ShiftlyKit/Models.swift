@@ -42,6 +42,8 @@ public struct Config: Codable {
     public var shift_types: [ShiftType]?
     /// Work-log folder (M5); nil = WorkLogStore.defaultDir.
     public var log_dir: String?
+    /// Quick-notes folder; nil = "<log_dir>/notes".
+    public var notes_dir: String?
 
     /// Times for a shift-type id: matching type, else config defaults.
     public func times(forShiftType id: String?) -> (start: String, end: String) {

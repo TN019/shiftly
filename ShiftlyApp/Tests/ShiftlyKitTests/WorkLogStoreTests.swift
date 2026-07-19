@@ -110,7 +110,7 @@ private func dayShift(_ date: String) -> PlannedShift {
                 "filesystem-unsafe characters sanitized")
 
         let path = try store.createNote(title: "买工作鞋", date: "2026-07-19")
-        #expect(path.hasSuffix("/19-07-26 | 买工作鞋.md"))
+        #expect(path.hasSuffix("/notes/19-07-26 | 买工作鞋.md"), "notes live in their own folder")
         #expect(try store.createNote(title: "买工作鞋", date: "2026-07-19") == path,
                 "same day + title returns the existing note")
         try store.createNote(title: "roster idea", date: "2026-07-20")
@@ -121,6 +121,12 @@ private func dayShift(_ date: String) -> PlannedShift {
         #expect(notes.map(\.date) == ["2026-07-20", "2026-07-19"])
         #expect(store.allDates() == ["2026-07-19"], "notes never count as daily logs")
         #expect(store.datesWithLogs(inMonth: "2026-07") == ["2026-07-19"])
+
+        // A dedicated notes folder overrides the default subfolder.
+        let separate = WorkLogStore(rootDir: dir, notesDir: dir + "/elsewhere")
+        try separate.createNote(title: "own dir", date: "2026-07-21")
+        #expect(separate.notes().map(\.title) == ["own dir"])
+        #expect(separate.notes().first?.path.contains("/elsewhere/") == true)
     }
 
     @Test func missingRootReportsNotExists() {

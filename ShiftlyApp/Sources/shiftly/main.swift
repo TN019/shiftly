@@ -107,8 +107,9 @@ func activeLogDate() -> String {
 }
 
 func logStore() -> WorkLogStore {
-    let dir = (try? store.loadConfig())?.log_dir ?? WorkLogStore.defaultDir
-    return WorkLogStore(rootDir: dir)
+    let config = try? store.loadConfig()
+    let dir = config?.log_dir ?? WorkLogStore.defaultDir
+    return WorkLogStore(rootDir: dir, notesDir: config?.notes_dir)
 }
 
 // MARK: - Commands

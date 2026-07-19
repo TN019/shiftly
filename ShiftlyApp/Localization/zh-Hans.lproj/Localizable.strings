@@ -437,3 +437,8 @@
 "No logs yet." = "还没有日志。";
 "Daily Logs (%lld)" = "工作日志 (%lld)";
 "Quick Notes (%lld)" = "快速笔记 (%lld)";
+"Quick Notes Folder" = "快速笔记目录";
+"New notes go to the new folder; existing files are neither moved nor deleted." = "新笔记会写入新目录；既有文件不会被移动或删除。";
+"Notes folder updated. Existing notes stay in the old folder." = "笔记目录已更新；既有笔记保留在旧目录。";
+"Could not save notes folder: %@" = "保存笔记目录失败：%@";
+"Choose the folder for your quick notes." = "选择存放快速笔记的文件夹。";

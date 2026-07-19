@@ -1,15 +1,20 @@
 import Foundation
 
 /// Markdown work logs in a user-chosen folder, one file per shift day named
-/// `dd-mm-yy.md` (2026-07-19 → `19-07-26.md`), flat in the folder. Files
-/// written by older versions under `YYYY/YYYY-MM-DD.md` stay readable and
-/// keep receiving appends. Files are plain Markdown with YAML frontmatter —
+/// `dd-mm-yy.md` (2026-07-19 → `19-07-26.md`), flat in the folder; quick
+/// notes (`dd-mm-yy | title.md`) live in their own folder. Files written by
+/// older versions under `YYYY/YYYY-MM-DD.md` stay readable and keep
+/// receiving appends. Files are plain Markdown with YAML frontmatter —
 /// any external editor can own them; Shiftly only creates, appends, reads.
 public struct WorkLogStore {
     public let rootDir: String
+    /// Quick notes live in their own folder (default: `<rootDir>/notes`).
+    public let notesDir: String
 
-    public init(rootDir: String) {
-        self.rootDir = (rootDir as NSString).expandingTildeInPath
+    public init(rootDir: String, notesDir: String? = nil) {
+        let root = (rootDir as NSString).expandingTildeInPath
+        self.rootDir = root
+        self.notesDir = ((notesDir ?? root + "/notes") as NSString).expandingTildeInPath
     }
 
     /// Default location when config.json has no log_dir.
@@ -155,9 +160,9 @@ public struct WorkLogStore {
     /// untouched.
     @discardableResult
     public func createNote(title: String, date: String, body: String = "") throws -> String {
-        let path = "\(rootDir)/\(Self.noteFileName(date: date, title: title))"
+        let path = "\(notesDir)/\(Self.noteFileName(date: date, title: title))"
         guard !FileManager.default.fileExists(atPath: path) else { return path }
-        try FileManager.default.createDirectory(atPath: rootDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: notesDir, withIntermediateDirectories: true)
         var content = "---\ndate: \(date)\ntags: []\n---\n\n"
         if !body.isEmpty {
             content += body.hasSuffix("\n") ? body : body + "\n"
@@ -180,7 +185,7 @@ public struct WorkLogStore {
 
     /// All quick notes, newest date first (title as tiebreaker).
     public func notes() -> [NoteRef] {
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: rootDir) else {
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: notesDir) else {
             return []
         }
         return names.compactMap { name -> NoteRef? in
@@ -193,7 +198,7 @@ public struct WorkLogStore {
             return NoteRef(
                 date: date,
                 title: String(stem[sep.upperBound...]),
-                path: "\(rootDir)/\(name)"
+                path: "\(notesDir)/\(name)"
             )
         }
         .sorted { ($0.date, $0.title) > ($1.date, $1.title) }
