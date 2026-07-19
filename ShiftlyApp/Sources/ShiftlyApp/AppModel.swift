@@ -636,17 +636,22 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Widget deep links (shiftly://start-work | record | new-note).
+    /// Widget deep links. start-work and new-note never open the main
+    /// window; meetings/open focus Shiftly (meetings also switches the
+    /// sidebar to the Meetings section).
     func handleDeepLink(_ url: URL) {
         switch url.host ?? url.lastPathComponent {
         case "start-work":
             runRoutine()
-        case "record":
-            isRecording ? stopRecording() : startRecording()
+        case "meetings", "record":
+            UserDefaults.standard.set(AppSection.meetings.rawValue, forKey: "shiftly.section")
+            NSApp.activate(ignoringOtherApps: true)
+            NSApp.windows.first { $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
         case "new-note":
             newQuickNote()
         default:
             NSApp.activate(ignoringOtherApps: true)
+            NSApp.windows.first { $0.canBecomeMain }?.makeKeyAndOrderFront(nil)
         }
     }
 

@@ -157,6 +157,7 @@ struct ContentView: View {
                 model.handleDeepLink(url)
             }
             .onAppear {
+                ShiftlyAppDelegate.model = model
                 model.load()
                 model.startAutoSyncIfEnabled()
                 model.applyMenuBarPreference()

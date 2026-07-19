@@ -169,10 +169,10 @@ struct ShiftlyWidgetView: View {
                     HStack(spacing: 6) {
                         ActionChip(url: "shiftly://start-work", icon: "play.fill",
                                    tint: .blue, title: "Start Work")
-                        ActionChip(url: "shiftly://record",
-                                   icon: isRecording ? "stop.fill" : "mic.fill",
+                        ActionChip(url: "shiftly://meetings",
+                                   icon: isRecording ? "waveform" : "mic.fill",
                                    tint: isRecording ? .red : .orange,
-                                   title: isRecording ? "Stop" : "Meeting")
+                                   title: isRecording ? "Recording" : "Meeting")
                         ActionChip(url: "shiftly://new-note",
                                    icon: "square.and.pencil", tint: .purple, title: "QNotes")
                     }
@@ -182,8 +182,8 @@ struct ShiftlyWidgetView: View {
                     NextShiftBlock(snapshot: entry.snapshot)
                     HStack(spacing: 6) {
                         ActionChip(url: "shiftly://start-work", icon: "play.fill", tint: .blue)
-                        ActionChip(url: "shiftly://record",
-                                   icon: isRecording ? "stop.fill" : "mic.fill",
+                        ActionChip(url: "shiftly://meetings",
+                                   icon: isRecording ? "waveform" : "mic.fill",
                                    tint: isRecording ? .red : .orange)
                         ActionChip(url: "shiftly://new-note",
                                    icon: "square.and.pencil", tint: .purple)

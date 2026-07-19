@@ -5,10 +5,22 @@ let menuBarEnabledKey = "shiftly.menuBarEnabled"
 let desktopWidgetEnabledKey = "shiftly.desktopWidgetEnabled"
 
 final class ShiftlyAppDelegate: NSObject, NSApplicationDelegate {
+    /// Set once the ContentView appears; widget deep links that must not
+    /// open the main window (start-work, new-note) land here.
+    static weak var model: AppModel?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         NSApp.windows.first?.makeKeyAndOrderFront(nil)
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            Task { @MainActor in
+                Self.model?.handleDeepLink(url)
+            }
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -41,5 +53,9 @@ struct ShiftlyAppMain: App {
             ContentView(model: model)
         }
         .defaultSize(width: 840, height: 780)
+        // Only "meetings" / "open" deep links may create or focus the main
+        // window; start-work and new-note run without showing Shiftly (the
+        // app delegate handles them).
+        .handlesExternalEvents(matching: ["meetings", "open"])
     }
 }
