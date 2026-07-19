@@ -139,8 +139,21 @@ class TestSyncRange(unittest.TestCase):
         first, last = sync_range([], [], today=self.TODAY)
         self.assertEqual((first, last), (self.TODAY, dt.date(2026, 7, 31)))
 
+    def test_earliest_anchor_extends_window_into_history(self):
+        first, last = sync_range([], [], today=self.TODAY, earliest=dt.date(2025, 11, 24))
+        self.assertEqual((first, last), (dt.date(2025, 11, 24), dt.date(2026, 7, 31)))
+
+    def test_future_earliest_never_shrinks_window(self):
+        first, last = sync_range([], [], today=self.TODAY, earliest=dt.date(2026, 8, 2))
+        self.assertEqual((first, last), (self.TODAY, dt.date(2026, 7, 31)))
+
     def test_next_month_mode(self):
         first, last = sync_range([], [], today=self.TODAY, mode="next_month")
+        self.assertEqual((first, last), (dt.date(2026, 8, 1), dt.date(2026, 8, 31)))
+
+    def test_next_month_mode_ignores_earliest(self):
+        first, last = sync_range([], [], today=self.TODAY, mode="next_month",
+                                 earliest=dt.date(2025, 11, 24))
         self.assertEqual((first, last), (dt.date(2026, 8, 1), dt.date(2026, 8, 31)))
 
     def test_next_month_mode_december(self):

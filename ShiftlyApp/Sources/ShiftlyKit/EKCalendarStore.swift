@@ -90,18 +90,31 @@ public final class EKCalendarStore: CalendarStore {
     }
 
     public func events(in window: DateInterval) throws -> [CalendarEventInfo] {
-        let predicate = eventStore.predicateForEvents(
-            withStart: window.start,
-            end: window.end,
-            calendars: [calendar]
-        )
-        return eventStore.events(matching: predicate).compactMap { event in
+        // EventKit predicates silently cap at ~4 years; the window now spans
+        // the whole schedule history, so fetch in yearly chunks and dedupe
+        // boundary events by id.
+        var raw: [EKEvent] = []
+        var chunkStart = window.start
+        while chunkStart < window.end {
+            let chunkEnd = min(
+                Calendar.current.date(byAdding: .year, value: 1, to: chunkStart) ?? window.end,
+                window.end
+            )
+            let predicate = eventStore.predicateForEvents(
+                withStart: chunkStart, end: chunkEnd, calendars: [calendar]
+            )
+            raw.append(contentsOf: eventStore.events(matching: predicate))
+            chunkStart = chunkEnd
+        }
+        var seen = Set<String>()
+        return raw.compactMap { event in
             guard let id = event.eventIdentifier,
                   let start = event.startDate,
                   let end = event.endDate,
                   // The engine ignores all-day and recurring events; Shiftly
                   // never creates them (design §7).
-                  !event.isAllDay, !event.hasRecurrenceRules else {
+                  !event.isAllDay, !event.hasRecurrenceRules,
+                  seen.insert(id).inserted else {
                 return nil
             }
             return CalendarEventInfo(

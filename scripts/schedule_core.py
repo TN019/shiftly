@@ -169,9 +169,11 @@ def month_end(day: dt.date) -> dt.date:
     return dt.date(day.year, day.month + 1, 1) - dt.timedelta(days=1)
 
 
-def sync_range(swaps: list, leave: list, today: dt.date | None = None, mode: str = "") -> tuple[dt.date, dt.date]:
-    """Sync window: today..month end (or the whole next month for mode
-    'next_month'), extended to cover the latest override date."""
+def sync_range(swaps: list, leave: list, today: dt.date | None = None, mode: str = "",
+               earliest: dt.date | None = None) -> tuple[dt.date, dt.date]:
+    """Sync window: earliest anchor (or today)..month end, so the whole
+    schedule history lives in the calendar too — or the whole next month
+    for mode 'next_month'. Extended to cover the latest override date."""
     today = today or dt.date.today()
     if mode == "next_month":
         first = dt.date(today.year + (1 if today.month == 12 else 0),
@@ -180,6 +182,8 @@ def sync_range(swaps: list, leave: list, today: dt.date | None = None, mode: str
     else:
         first = today
         last = month_end(today)
+        if earliest is not None and earliest < first:
+            first = earliest
 
     def date_or_none(s):
         try:
