@@ -387,12 +387,17 @@ case ("sync", "now"):
         }
         do {
             let config = try store.loadConfig()
-            let calendar = try EKCalendarStore.locateOrCreateCalendar(named: config.calendar_name, in: ekStore)
+            let stateStore = SyncStateStore(paths: paths)
+            let calendar = try EKCalendarStore.locateOrCreateCalendar(
+                named: config.calendar_name, in: ekStore,
+                preferredID: stateStore.load().calendar_id
+            )
             let coordinator = SyncCoordinator(
                 store: store,
-                stateStore: SyncStateStore(paths: paths),
+                stateStore: stateStore,
                 calendar: EKCalendarStore(eventStore: ekStore, calendar: calendar),
-                provider: PlannerScriptProvider(root: paths.root)
+                provider: PlannerScriptProvider(root: paths.root),
+                calendarIdentifier: calendar.calendarIdentifier
             )
             let outcome = try coordinator.sync()
             emit([

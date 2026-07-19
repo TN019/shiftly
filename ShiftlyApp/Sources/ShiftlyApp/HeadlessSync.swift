@@ -38,14 +38,17 @@ enum HeadlessSync {
         do {
             let store = DataStore(paths: paths)
             let config = try store.loadConfig()
+            let stateStore = SyncStateStore(paths: paths)
             let calendar = try EKCalendarStore.locateOrCreateCalendar(
-                named: config.calendar_name, in: ekStore
+                named: config.calendar_name, in: ekStore,
+                preferredID: stateStore.load().calendar_id
             )
             let coordinator = SyncCoordinator(
                 store: store,
-                stateStore: SyncStateStore(paths: paths),
+                stateStore: stateStore,
                 calendar: EKCalendarStore(eventStore: ekStore, calendar: calendar),
-                provider: PlannerScriptProvider(root: paths.root)
+                provider: PlannerScriptProvider(root: paths.root),
+                calendarIdentifier: calendar.calendarIdentifier
             )
             let outcome = try coordinator.sync()
             print("synced: +\(outcome.created) ~\(outcome.updated) -\(outcome.deleted), readback \(outcome.readbacks.count)")

@@ -830,14 +830,17 @@ final class AppModel: ObservableObject {
                 let outcome = try await Task.detached(priority: .userInitiated) {
                     let store = DataStore(paths: syncPaths)
                     let config = try store.loadConfig()
+                    let stateStore = SyncStateStore(paths: syncPaths)
                     let calendar = try EKCalendarStore.locateOrCreateCalendar(
-                        named: config.calendar_name, in: ekStore
+                        named: config.calendar_name, in: ekStore,
+                        preferredID: stateStore.load().calendar_id
                     )
                     let coordinator = SyncCoordinator(
                         store: store,
-                        stateStore: SyncStateStore(paths: syncPaths),
+                        stateStore: stateStore,
                         calendar: EKCalendarStore(eventStore: ekStore, calendar: calendar),
-                        provider: PlannerScriptProvider(root: root)
+                        provider: PlannerScriptProvider(root: root),
+                        calendarIdentifier: calendar.calendarIdentifier
                     )
                     return try coordinator.sync()
                 }.value

@@ -211,6 +211,55 @@ private func applyReadbacks(_ readbacks: [ReadbackChange], to planned: [PlannedS
 }
 
 @Suite struct SyncEngineRecovery {
+    @Test func allTrackedEventsVanishedRecreatesInsteadOfLeaveSpam() throws {
+        // Calendar deleted/recreated/swapped: every tracked event is gone at
+        // once. That must read as state loss (recreate), not as the user
+        // taking leave on every planned day.
+        let store = InMemoryCalendarStore()
+        let planned = [shift("2026-07-20"), shift("2026-07-21"), shift("2026-07-24")]
+        let s1 = try syncOnce(planned: planned, store: store, state: .empty)
+
+        for entry in s1.state.entries {
+            store.userDelete(id: entry.event_id)
+        }
+
+        let s2 = try syncOnce(planned: planned, store: store, state: s1.state)
+        #expect(s2.plan.readbacks.isEmpty)
+        #expect(s2.plan.creates.count == 3)
+
+        let s3 = try syncOnce(planned: planned, store: store, state: s2.state)
+        #expect(s3.plan.isNoop)
+    }
+
+    @Test func oneSurvivorKeepsPerDayDeleteReadbacks() throws {
+        // As long as any tracked event still exists, missing ones are honest
+        // per-day deletions.
+        let store = InMemoryCalendarStore()
+        let planned = [shift("2026-07-20"), shift("2026-07-21")]
+        let s1 = try syncOnce(planned: planned, store: store, state: .empty)
+
+        let id = s1.state.entries.first { $0.date == "2026-07-21" }!.event_id
+        store.userDelete(id: id)
+
+        let s2 = try syncOnce(planned: planned, store: store, state: s1.state)
+        #expect(s2.plan.readbacks == [.deleted(date: "2026-07-21")])
+        #expect(s2.plan.creates.isEmpty)
+    }
+
+    @Test func calendarSelectionPrefersRememberedID() {
+        let candidates = [(id: "A", title: "Shifts"), (id: "B", title: "Shifts")]
+        // Remembered id wins over list order among duplicate names.
+        #expect(EKCalendarStore.selectCalendarID(preferredID: "B", name: "Shifts", candidates: candidates) == "B")
+        // No memory: first by name.
+        #expect(EKCalendarStore.selectCalendarID(preferredID: nil, name: "Shifts", candidates: candidates) == "A")
+        // Remembered calendar renamed or gone: fall back to by-name.
+        #expect(EKCalendarStore.selectCalendarID(
+            preferredID: "C", name: "Shifts", candidates: candidates) == "A")
+        #expect(EKCalendarStore.selectCalendarID(
+            preferredID: "A", name: "Work Cal",
+            candidates: [(id: "A", title: "Shifts")]) == nil, "config renamed: create new")
+    }
+
     @Test func stateLossReclaimsWithoutDuplicates() throws {
         let store = InMemoryCalendarStore()
         let planned = [shift("2026-07-20"), shift("2026-07-21")]

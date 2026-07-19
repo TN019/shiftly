@@ -46,13 +46,35 @@ public final class EKCalendarStore: CalendarStore {
         self.calendar = calendar
     }
 
-    /// Finds the calendar by name, creating it in the default source when
-    /// missing.
+    /// Picks which calendar to sync into. The id remembered from the last
+    /// sync wins while its calendar still carries the configured name, so
+    /// duplicate names (or unstable calendar ordering) cannot silently
+    /// switch calendars between runs — which would make every tracked event
+    /// look user-deleted. Returns nil when a new calendar must be created.
+    public static func selectCalendarID(
+        preferredID: String?,
+        name: String,
+        candidates: [(id: String, title: String)]
+    ) -> String? {
+        if let id = preferredID, candidates.contains(where: { $0.id == id && $0.title == name }) {
+            return id
+        }
+        return candidates.first(where: { $0.title == name })?.id
+    }
+
+    /// Finds the calendar by remembered id (see `selectCalendarID`), then by
+    /// name, creating it in the default source when missing.
     public static func locateOrCreateCalendar(
         named name: String,
-        in eventStore: EKEventStore
+        in eventStore: EKEventStore,
+        preferredID: String? = nil
     ) throws -> EKCalendar {
-        if let existing = eventStore.calendars(for: .event).first(where: { $0.title == name }) {
+        let calendars = eventStore.calendars(for: .event)
+        if let id = selectCalendarID(
+            preferredID: preferredID,
+            name: name,
+            candidates: calendars.map { ($0.calendarIdentifier, $0.title) }
+        ), let existing = calendars.first(where: { $0.calendarIdentifier == id }) {
             return existing
         }
         let calendar = EKCalendar(for: .event, eventStore: eventStore)
