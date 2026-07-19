@@ -748,8 +748,9 @@ final class AppModel: ObservableObject {
                 let now = Date()
                 let thisMonthStart = cal.date(from: cal.dateComponents([.year, .month], from: now)) ?? now
                 let windowStart = cal.date(byAdding: .month, value: -11, to: thisMonthStart) ?? now
-                let dayCount = cal.range(of: .day, in: .month, for: thisMonthStart)?.count ?? 28
-                let windowEnd = cal.date(byAdding: .day, value: dayCount - 1, to: thisMonthStart) ?? now
+                // Pay counts worked shifts only — stop at today so future
+                // planned shifts (later this month) are not counted as earned.
+                let windowEnd = now
                 let df = DateFormatter()
                 df.dateFormat = "yyyy-MM-dd"
                 let source = SyncDataSource(
@@ -1063,6 +1064,7 @@ final class AppModel: ObservableObject {
             syncState = .unsynced
             statusMessage = L("Schedule saved.")
             refreshNextShift()
+            if autoLaunchMode == .workdays { applyAutoLaunch() }
             return true
         } catch {
             statusMessage = LF("Save failed: %@", error.localizedDescription)
@@ -1581,21 +1583,6 @@ final class AppModel: ObservableObject {
     // MARK: Menu bar (AppKit NSStatusItem; see MenuBarController)
 
     private lazy var menuBar = MenuBarController(model: self)
-    private lazy var desktopWidget = DesktopWidgetController(model: self)
-
-    var desktopWidgetEnabled: Bool {
-        UserDefaults.standard.bool(forKey: desktopWidgetEnabledKey)
-    }
-
-    func applyDesktopWidgetPreference() {
-        desktopWidget.setEnabled(desktopWidgetEnabled)
-    }
-
-    func setDesktopWidgetEnabled(_ enabled: Bool) {
-        UserDefaults.standard.set(enabled, forKey: desktopWidgetEnabledKey)
-        desktopWidget.setEnabled(enabled)
-        objectWillChange.send()
-    }
 
     var menuBarEnabled: Bool {
         UserDefaults.standard.bool(forKey: menuBarEnabledKey)
@@ -1612,22 +1599,71 @@ final class AppModel: ObservableObject {
         objectWillChange.send()
     }
 
-    // MARK: Launch at login (SMAppService; only effective for the bundled
-    // Shiftly.app, not `swift run`)
+    // MARK: Auto-launch (SMAppService at login, or a launchd agent that
+    // opens Shiftly on workdays at a set time; bundled Shiftly.app only)
 
-    @Published var launchAtLogin = SMAppService.mainApp.status == .enabled
+    enum AutoLaunchMode: String { case off, login, workdays }
 
-    func setLaunchAtLogin(_ enabled: Bool) {
-        do {
-            if enabled {
+    static let autoLaunchModeKey = "shiftly.autoLaunchMode"
+    static let workdayLaunchMinutesKey = "shiftly.workdayLaunchMinutes"
+
+    @Published var autoLaunchMode: AutoLaunchMode = {
+        if let raw = UserDefaults.standard.string(forKey: AppModel.autoLaunchModeKey),
+           let mode = AutoLaunchMode(rawValue: raw) {
+            return mode
+        }
+        // Back-compat: a pre-existing login item reads as .login.
+        return SMAppService.mainApp.status == .enabled ? .login : .off
+    }()
+
+    /// Time of day the workday agent fires (defaults to 09:00).
+    @Published var workdayLaunchTime: Date = {
+        let minutes = UserDefaults.standard.object(forKey: AppModel.workdayLaunchMinutesKey) as? Int ?? 540
+        return Calendar.current.date(
+            bySettingHour: minutes / 60, minute: minutes % 60, second: 0, of: Date()
+        ) ?? Date()
+    }()
+
+    /// Workdays of the schedule going forward (the latest rule's days).
+    var currentWorkdays: [String] {
+        rules.max(by: { $0.effective_from < $1.effective_from })?.workdays ?? []
+    }
+
+    func setAutoLaunchMode(_ mode: AutoLaunchMode) {
+        UserDefaults.standard.set(mode.rawValue, forKey: Self.autoLaunchModeKey)
+        autoLaunchMode = mode
+        applyAutoLaunch()
+    }
+
+    func setWorkdayLaunchTime(_ date: Date) {
+        workdayLaunchTime = date
+        let c = Calendar.current.dateComponents([.hour, .minute], from: date)
+        UserDefaults.standard.set((c.hour ?? 9) * 60 + (c.minute ?? 0), forKey: Self.workdayLaunchMinutesKey)
+        if autoLaunchMode == .workdays { applyAutoLaunch() }
+    }
+
+    /// Re-run whenever the mode, time, or workdays change so the launchd
+    /// agent always mirrors the current schedule.
+    func applyAutoLaunch() {
+        switch autoLaunchMode {
+        case .off:
+            try? SMAppService.mainApp.unregister()
+            WorkdayLauncher.uninstall()
+        case .login:
+            WorkdayLauncher.uninstall()
+            do {
                 try SMAppService.mainApp.register()
-            } else {
-                try SMAppService.mainApp.unregister()
+            } catch {
+                statusMessage = LF("Launch at login unavailable: %@ (requires the bundled Shiftly.app)", error.localizedDescription)
             }
-            launchAtLogin = SMAppService.mainApp.status == .enabled
-        } catch {
-            launchAtLogin = SMAppService.mainApp.status == .enabled
-            statusMessage = LF("Launch at login unavailable: %@ (requires the bundled Shiftly.app)", error.localizedDescription)
+        case .workdays:
+            try? SMAppService.mainApp.unregister()
+            let c = Calendar.current.dateComponents([.hour, .minute], from: workdayLaunchTime)
+            WorkdayLauncher.install(
+                appBundlePath: Bundle.main.bundlePath,
+                workdays: currentWorkdays,
+                hour: c.hour ?? 9, minute: c.minute ?? 0
+            )
         }
     }
 }

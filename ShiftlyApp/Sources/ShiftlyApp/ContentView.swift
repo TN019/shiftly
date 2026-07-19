@@ -161,7 +161,6 @@ struct ContentView: View {
                 model.load()
                 model.startAutoSyncIfEnabled()
                 model.applyMenuBarPreference()
-                model.applyDesktopWidgetPreference()
                 DispatchQueue.main.async {
                     resignAllFocus()
                 }
@@ -509,11 +508,9 @@ struct ContentView: View {
         card("General") {
             Toggle("Show in menu bar (keeps Shiftly running when the window is closed)", isOn: menuBarBinding)
                 .toggleStyle(.checkbox)
-            Toggle("Show desktop widget (next shift + one-click start work)", isOn: Binding(
-                get: { model.desktopWidgetEnabled },
-                set: { model.setDesktopWidgetEnabled($0) }
-            ))
-            .toggleStyle(.checkbox)
+            Text("Add the desktop widgets from the system gallery: right-click the desktop → Edit Widgets → search \"Shiftly\".")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
 
         routineSettingsCard
@@ -558,14 +555,40 @@ struct ContentView: View {
                 .labelsHidden()
                 .pickerStyle(.menu)
                 .frame(width: 110)
-                Toggle("Launch at login", isOn: Binding(
-                    get: { model.launchAtLogin },
-                    set: { model.setLaunchAtLogin($0) }
-                ))
-                .toggleStyle(.checkbox)
                 Spacer(minLength: 0)
             }
-            Text("Auto-sync runs while Shiftly is open; pair it with Launch at login to survive reboots. Headless syncing without the app uses the launchd template (see README).")
+            Text("Auto-sync runs while Shiftly is open. Headless syncing without the app uses the launchd template (see README).")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+
+        card("Auto-launch") {
+            HStack(spacing: 14) {
+                Text("Launch Shiftly").font(.subheadline)
+                Picker("", selection: Binding(
+                    get: { model.autoLaunchMode },
+                    set: { model.setAutoLaunchMode($0) }
+                )) {
+                    Text("Never").tag(AppModel.AutoLaunchMode.off)
+                    Text("At login").tag(AppModel.AutoLaunchMode.login)
+                    Text("On workdays").tag(AppModel.AutoLaunchMode.workdays)
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 130)
+                if model.autoLaunchMode == .workdays {
+                    Text("at").font(.subheadline).foregroundStyle(.secondary)
+                    DatePicker("", selection: Binding(
+                        get: { model.workdayLaunchTime },
+                        set: { model.setWorkdayLaunchTime($0) }
+                    ), displayedComponents: .hourAndMinute)
+                    .labelsHidden()
+                }
+                Spacer(minLength: 0)
+            }
+            Text(model.autoLaunchMode == .workdays
+                 ? "Shiftly opens on your scheduled work days at this time — it updates automatically when your workdays change."
+                 : "Choose whether Shiftly launches itself, so auto-sync and reminders keep running. Needs the bundled Shiftly.app.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }

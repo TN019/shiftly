@@ -1,6 +1,7 @@
 import AppKit
 import ShiftlyKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 extension ContentView {
     // MARK: Today card
@@ -58,8 +59,7 @@ extension ContentView {
                 Text("Add:")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Button("DingTalk") { appendStep(.init(kind: "app", value: "DingTalk")) }
-                Button("WeChat") { appendStep(.init(kind: "app", value: "WeChat")) }
+                Button("App…") { addAppStep() }
                 Button("Website…") { appendStep(.init(kind: "url", value: "https://")) }
                 Button("Ghostty @ folder…") { addGhosttyStep() }
                 Button("Sync") { appendStep(.init(kind: "sync", value: "")) }
@@ -157,6 +157,23 @@ extension ContentView {
 
     private func appendStep(_ step: RoutineStep) {
         model.updateRoutine(model.routine + [step])
+    }
+
+    /// Pick an application from /Applications and add it as an app step.
+    /// The step stores the app's display name (open -a resolves it).
+    private func addAppStep() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.application]
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.prompt = "Add"
+        panel.message = "Choose an app to open when you start work."
+        if panel.runModal() == .OK, let url = panel.url {
+            let name = url.deletingPathExtension().lastPathComponent
+            appendStep(.init(kind: "app", value: name))
+        }
     }
 
     private func addGhosttyStep() {

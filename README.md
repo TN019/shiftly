@@ -77,7 +77,8 @@ off land on your last workday's page, and everything is searchable.
 ### 🔔 Lives in your menu bar
 
 Next shift and countdown at a glance, one-click sync, pre-shift reminders
-(configurable lead time), auto-sync on a schedule, launch at login. Close the
+(configurable lead time), auto-sync on a schedule, auto-launch at login or on
+your workdays at a set time. Close the
 window — Shiftly keeps working.
 
 ### 🤖 Built for the AI era
