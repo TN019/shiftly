@@ -126,4 +126,4 @@ both in sync.
 [PolyForm Noncommercial 1.0.0](LICENSE) — free for personal and other
 noncommercial use; commercial use requires a separate license from the author.
 
-> Required Notice: Copyright (c) 2026 Blake Liu (https://github.com/TN019/shiftly)
+> Required Notice: Copyright (c) 2026 Zishen Liu (https://github.com/TN019/shiftly)
