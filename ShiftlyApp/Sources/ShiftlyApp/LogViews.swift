@@ -99,20 +99,6 @@ extension ContentView {
                 }
                 .buttonStyle(.borderedProminent)
             }
-            if model.quickNotes.isEmpty {
-                Text("No notes yet.")
-                    .font(.subheadline)
-                    .foregroundStyle(.tertiary)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(model.quickNotes) { note in
-                            noteRow(note)
-                        }
-                    }
-                }
-                .frame(maxHeight: 240)
-            }
         }
     }
 
@@ -155,7 +141,7 @@ extension ContentView {
     // MARK: Search
 
     private var logSearchCard: some View {
-        card("Search") {
+        card("Logs") {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
@@ -168,54 +154,61 @@ extension ContentView {
                 model.searchLogs(query: logSearchQuery)
             }
 
-            let query = logSearchQuery.trimmingCharacters(in: .whitespaces)
-            if !query.isEmpty {
-                if model.logSearchResults.isEmpty && model.noteSearchResults.isEmpty {
-                    Text("No matches.")
-                        .font(.subheadline)
-                        .foregroundStyle(.tertiary)
-                } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 4) {
-                            if !model.logSearchResults.isEmpty {
-                                Text("Daily Logs")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                                ForEach(model.logSearchResults) { hit in
-                                    logHitRow(hit)
-                                }
+            let searching = !logSearchQuery.trimmingCharacters(in: .whitespaces).isEmpty
+            let logDates = searching ? model.logSearchResults.map(\.date) : model.logDates
+            let notes = searching ? model.noteSearchResults : model.quickNotes
+            let snippets = Dictionary(
+                model.logSearchResults.map { ($0.date, $0.snippet) },
+                uniquingKeysWith: { a, _ in a }
+            )
+
+            if logDates.isEmpty && notes.isEmpty {
+                Text(searching ? "No matches." : "No logs yet.")
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if !logDates.isEmpty {
+                            Text("Daily Logs")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            ForEach(logDates, id: \.self) { date in
+                                logRow(date: date, snippet: searching ? snippets[date] : nil)
                             }
-                            if !model.noteSearchResults.isEmpty {
-                                Text("Quick Notes")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.secondary)
-                                    .padding(.top, model.logSearchResults.isEmpty ? 0 : 6)
-                                ForEach(model.noteSearchResults) { note in
-                                    noteRow(note)
-                                }
+                        }
+                        if !notes.isEmpty {
+                            Text("Quick Notes")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .padding(.top, logDates.isEmpty ? 0 : 6)
+                            ForEach(notes) { note in
+                                noteRow(note)
                             }
                         }
                     }
-                    .frame(maxHeight: 260)
                 }
+                .frame(maxHeight: 340)
             }
         }
     }
 
     @ViewBuilder
-    private func logHitRow(_ hit: WorkLogStore.SearchHit) -> some View {
+    private func logRow(date: String, snippet: String?) -> some View {
         HStack(spacing: 10) {
             Button {
-                let path = model.logStore.resolvedPath(for: hit.date)
-                model.editFile(path: path, title: LF("Daily Log — %@", hit.date))
+                let path = model.logStore.resolvedPath(for: date)
+                model.editFile(path: path, title: LF("Daily Log — %@", date))
             } label: {
                 HStack(spacing: 10) {
-                    Text(hit.date)
+                    Text(date)
                         .font(.system(.subheadline, design: .monospaced))
-                    Text(hit.snippet)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    if let snippet {
+                        Text(snippet)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                     Spacer(minLength: 0)
                 }
                 .contentShape(Rectangle())
@@ -223,7 +216,7 @@ extension ContentView {
             .buttonStyle(.plain)
             .help("Open in Shiftly")
             Button {
-                model.openInVSCode(path: model.logStore.resolvedPath(for: hit.date))
+                model.openInVSCode(path: model.logStore.resolvedPath(for: date))
             } label: {
                 Image(systemName: "chevron.left.forwardslash.chevron.right")
                     .font(.caption)

@@ -62,6 +62,8 @@ final class AppModel: ObservableObject {
     /// Standalone quick notes (`dd-mm-yy | title.md`), newest first.
     @Published var quickNotes: [WorkLogStore.NoteRef] = []
     @Published var noteSearchResults: [WorkLogStore.NoteRef] = []
+    /// Every day with a daily log, newest first (the Logs browser).
+    @Published var logDates: [String] = []
     /// Days with a log file in the calendar's displayed month.
     @Published var monthLogDates: Set<String> = []
     @Published var logSearchResults: [WorkLogStore.SearchHit] = []
@@ -298,6 +300,7 @@ final class AppModel: ObservableObject {
         logDirExists = logStore.rootExists
         todayLogContent = logStore.read(date: activeLogDate)
         quickNotes = logDirExists ? logStore.notes() : []
+        logDates = logDirExists ? logStore.allDates().sorted(by: >) : []
     }
 
     /// Append a timestamped entry to the active daily log (created on
