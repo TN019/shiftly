@@ -49,7 +49,9 @@ struct ShiftlyAppMain: App {
         // The menu bar item is an AppKit NSStatusItem owned by AppModel —
         // SwiftUI's MenuBarExtra(isInserted:) spins the scene-update loop
         // at 100% CPU (see MenuBarController).
-        WindowGroup(id: "main") {
+        // A single-instance Window (not WindowGroup): deep links and Dock
+        // clicks reuse the one main window instead of spawning more.
+        Window("Shiftly", id: "main") {
             ContentView(model: model)
         }
         .defaultSize(width: 840, height: 780)
