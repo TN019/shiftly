@@ -5,87 +5,271 @@ extension ContentView {
     @ViewBuilder
     var logSection: some View {
         if model.logDirExists {
-            logQuickCaptureCard
             logTodayCard
+            quickNotesCard
             logSearchCard
         } else {
             logSetupCard
         }
     }
 
-    // MARK: Search
+    // MARK: Daily log
 
-    private var logSearchCard: some View {
-        card("Search Logs") {
+    private var logTodayCard: some View {
+        card("Daily Log") {
             HStack(spacing: 10) {
-                TextField("Keyword — matches frontmatter and body", text: $logSearchQuery)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit { runLogSearch() }
-                Toggle("Date range", isOn: $logSearchUseRange)
-                    .toggleStyle(.checkbox)
-                    .font(.caption)
-                if logSearchUseRange {
-                    styledDatePicker($logSearchFrom)
-                    styledDatePicker($logSearchTo)
+                Text(model.activeLogDate)
+                    .font(.system(.subheadline, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                if model.activeLogDate != ContentView.ymdString(Date()) {
+                    Text("no shift today — last workday")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
                 }
-                Button("Search") { runLogSearch() }
-                    .buttonStyle(.bordered)
-                    .disabled(logSearchQuery.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-            if !model.logSearchResults.isEmpty {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(model.logSearchResults) { hit in
-                            Button {
-                                model.openLog(date: hit.date)
-                            } label: {
-                                HStack(spacing: 10) {
-                                    Text(hit.date)
-                                        .font(.system(.subheadline, design: .monospaced))
-                                    Text(hit.snippet)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                    Spacer(minLength: 0)
-                                    Image(systemName: "arrow.up.forward.square")
-                                        .font(.caption)
-                                        .foregroundStyle(.tertiary)
-                                }
-                                .padding(.vertical, 5)
-                                .padding(.horizontal, 10)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(Color.primary.opacity(0.05))
-                            )
+                Spacer(minLength: 0)
+                Button {
+                    model.editDailyLog()
+                } label: {
+                    Label("Edit", systemImage: "square.and.pencil")
+                }
+                .buttonStyle(.borderedProminent)
+                Button("Open in VS Code") {
+                    Task { @MainActor in
+                        if let path = await model.ensureLog(date: model.activeLogDate) {
+                            model.openInVSCode(path: path)
                         }
                     }
                 }
-                .frame(maxHeight: 200)
-            } else if logSearchRan {
-                Text("No matches.")
+                .buttonStyle(.bordered)
+                Button("Show in Finder") {
+                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: model.logDir)
+                }
+                .buttonStyle(.bordered)
+            }
+
+            HStack(spacing: 10) {
+                TextField("Quick entry — appended with a timestamp", text: $logQuickText)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { submitQuickCapture() }
+                Button("Add") { submitQuickCapture() }
+                    .buttonStyle(.bordered)
+                    .disabled(logQuickText.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+
+            if let content = model.todayLogContent {
+                ScrollView {
+                    MarkdownPreview(content: content)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                }
+                .frame(minHeight: 140, maxHeight: 300)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.primary.opacity(0.04))
+                )
+            } else {
+                Text("No log for this day yet — Edit opens the editor, or add a quick entry above.")
                     .font(.subheadline)
                     .foregroundStyle(.tertiary)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            model.refreshLogState()
+        }
     }
 
-    private func runLogSearch() {
-        let query = logSearchQuery.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { return }
-        logSearchRan = true
-        model.searchLogs(
-            query: query,
-            from: logSearchUseRange ? ContentView.ymdString(logSearchFrom) : nil,
-            to: logSearchUseRange ? ContentView.ymdString(logSearchTo) : nil
+    private func submitQuickCapture() {
+        model.quickCapture(logQuickText)
+        logQuickText = ""
+    }
+
+    // MARK: Quick notes
+
+    private var quickNotesCard: some View {
+        card("Quick Notes") {
+            HStack(spacing: 10) {
+                Text("Standalone notes — dd-mm-yy | title.md")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+                Button {
+                    model.newQuickNote()
+                } label: {
+                    Label("New Note", systemImage: "note.text.badge.plus")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+    }
+
+    @ViewBuilder
+    func noteRow(_ note: WorkLogStore.NoteRef) -> some View {
+        HStack(spacing: 10) {
+            Button {
+                model.editFile(path: note.path, title: note.title)
+            } label: {
+                HStack(spacing: 10) {
+                    Text(note.date)
+                        .font(.system(.subheadline, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    Text(note.title)
+                        .font(.subheadline)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Open in Shiftly")
+            Button {
+                model.openInVSCode(path: note.path)
+            } label: {
+                Image(systemName: "chevron.left.forwardslash.chevron.right")
+                    .font(.caption)
+            }
+            .buttonStyle(.borderless)
+            .help("Open in VS Code")
+        }
+        .padding(.vertical, 5)
+        .padding(.horizontal, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.primary.opacity(0.05))
+        )
+    }
+
+    // MARK: Search
+
+    private var logSearchCard: some View {
+        card("Logs") {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Search logs and notes as you type", text: $logSearchQuery)
+                    .textFieldStyle(.roundedBorder)
+            }
+            .task(id: logSearchQuery) {
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                guard !Task.isCancelled else { return }
+                model.searchLogs(query: logSearchQuery)
+            }
+
+            let searching = !logSearchQuery.trimmingCharacters(in: .whitespaces).isEmpty
+            let logDates = searching ? model.logSearchResults.map(\.date) : model.logDates
+            let notes = searching ? model.noteSearchResults : model.quickNotes
+            let snippets = Dictionary(
+                model.logSearchResults.map { ($0.date, $0.snippet) },
+                uniquingKeysWith: { a, _ in a }
+            )
+
+            HStack(spacing: 4) {
+                logsSegment(LF("Daily Logs (%lld)", logDates.count), showsNotes: false)
+                logsSegment(LF("Quick Notes (%lld)", notes.count), showsNotes: true)
+            }
+            .padding(3)
+            .background(
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(Color.primary.opacity(0.06))
+            )
+
+            if logsListShowsNotes {
+                if notes.isEmpty {
+                    Text(searching ? "No matches." : "No notes yet.")
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(notes) { note in
+                                noteRow(note)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 340)
+                }
+            } else {
+                if logDates.isEmpty {
+                    Text(searching ? "No matches." : "No logs yet.")
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(logDates, id: \.self) { date in
+                                logRow(date: date, snippet: searching ? snippets[date] : nil)
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 340)
+                }
+            }
+        }
+    }
+
+    /// Full-width segmented button (the native segmented picker never
+    /// stretches on macOS, so it cannot line up with the search field).
+    private func logsSegment(_ title: String, showsNotes: Bool) -> some View {
+        Button {
+            logsListShowsNotes = showsNotes
+        } label: {
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(logsListShowsNotes == showsNotes
+                              ? Color.accentColor
+                              : Color.clear)
+                )
+                .foregroundStyle(logsListShowsNotes == showsNotes ? Color.white : Color.primary)
+                .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func logRow(date: String, snippet: String?) -> some View {
+        HStack(spacing: 10) {
+            Button {
+                let path = model.logStore.resolvedPath(for: date)
+                model.editFile(path: path, title: LF("Daily Log — %@", date))
+            } label: {
+                HStack(spacing: 10) {
+                    Text(date)
+                        .font(.system(.subheadline, design: .monospaced))
+                    if let snippet {
+                        Text(snippet)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Open in Shiftly")
+            Button {
+                model.openInVSCode(path: model.logStore.resolvedPath(for: date))
+            } label: {
+                Image(systemName: "chevron.left.forwardslash.chevron.right")
+                    .font(.caption)
+            }
+            .buttonStyle(.borderless)
+            .help("Open in VS Code")
+        }
+        .padding(.vertical, 5)
+        .padding(.horizontal, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.primary.opacity(0.05))
         )
     }
 
     private var logSetupCard: some View {
         card("Work Log") {
-            Text("Daily Markdown logs live in a folder you own — one file per day (YYYY/YYYY-MM-DD.md) with the shift pre-filled, editable with any app.")
+            Text("Daily Markdown logs live in a folder you own — one file per shift day (dd-mm-yy.md) with the shift pre-filled, plus standalone quick notes (dd-mm-yy | title.md), editable with any app.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -108,85 +292,6 @@ extension ContentView {
         }
     }
 
-    // MARK: Quick capture
-
-    private var logQuickCaptureCard: some View {
-        card("") {
-            HStack(spacing: 10) {
-                Image(systemName: "square.and.pencil")
-                    .font(.title3)
-                    .foregroundStyle(Color.accentColor)
-                TextField("Quick note — appended to today's log with a timestamp", text: $logQuickText)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit { submitQuickCapture() }
-                Button("Add") { submitQuickCapture() }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(logQuickText.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-        }
-    }
-
-    private func submitQuickCapture() {
-        model.quickCapture(logQuickText)
-        logQuickText = ""
-    }
-
-    // MARK: Today's log
-
-    private var logTodayCard: some View {
-        card("Today's Log") {
-            HStack(spacing: 10) {
-                Picker("", selection: $logShowRaw) {
-                    Text("Preview").tag(false)
-                    Text("Raw").tag(true)
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 170)
-                Spacer(minLength: 0)
-                Button("Open in Editor") {
-                    model.openTodayLog()
-                }
-                .buttonStyle(.bordered)
-                Button("Show in Finder") {
-                    NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: model.logDir)
-                }
-                .buttonStyle(.bordered)
-            }
-
-            if let content = model.todayLogContent {
-                ScrollView {
-                    Group {
-                        if logShowRaw {
-                            Text(content)
-                                .font(.system(.caption, design: .monospaced))
-                                .textSelection(.enabled)
-                        } else {
-                            MarkdownPreview(content: content)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
-                }
-                .frame(minHeight: 160, maxHeight: 340)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.primary.opacity(0.04))
-                )
-            } else {
-                Text("No log for today yet — add a quick note above or open it in an editor to start.")
-                    .font(.subheadline)
-                    .foregroundStyle(.tertiary)
-            }
-            Text("Edits made in other apps show up when Shiftly comes back to the front.")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            model.refreshLogState()
-        }
-    }
-
     func chooseLogFolder() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
@@ -196,6 +301,18 @@ extension ContentView {
         panel.message = "Choose the folder for your work logs."
         if panel.runModal() == .OK, let url = panel.url {
             model.adoptLogDir(url)
+        }
+    }
+
+    func chooseNotesFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.prompt = "Use This Folder"
+        panel.message = "Choose the folder for your quick notes."
+        if panel.runModal() == .OK, let url = panel.url {
+            model.adoptNotesDir(url)
         }
     }
 }

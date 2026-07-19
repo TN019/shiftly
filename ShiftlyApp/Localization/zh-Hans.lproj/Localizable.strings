@@ -98,7 +98,7 @@
 "Swap to" = "换到";
 "Take leave on this day" = "这天请假";
 "Add leave on this day" = "这天添加请假";
-"Covered by a leave range — manage it under Today → Overrides." = "该日在请假区间内——请到「今日 → 换班与请假」管理。";
+"Covered by a leave range — manage it under Shift → Overrides." = "该日在请假区间内——请到「排班 → 换班与请假」管理。";
 "Write log entry" = "写日志";
 "Work logs arrive in milestone M5" = "工作日志将在里程碑 M5 上线";
 
@@ -358,3 +358,123 @@
 "%lld already present, kept as they were." = "%lld 天已存在，保持原样。";
 "%lld days had multiple events and were merged into one span." = "%lld 天有多个事件，已合并为一段。";
 "History import failed." = "历史导入失败。";
+
+/* Today / Shift split */
+"Adjust Today" = "今日调整";
+"Take Today Off" = "今天请假";
+"Move today's shift to" = "把今天的班移到";
+"Move" = "移动";
+"No shift scheduled today." = "今天没有排班。";
+"Both write through to Apple Calendar right away. Undo by removing the entry on the Shift page." = "都会立即写入 Apple Calendar；在排班页删除对应条目即可撤销。";
+"Select at least one workday, then save." = "请先选择至少一个工作日再保存。";
+
+/* Reset */
+"Reset" = "重置";
+"Erase all Shiftly data — schedule, overrides, imported history, pay, routine and sync state — and start over from the welcome screen. Apple Calendar events and work log files are not touched." = "清除 Shiftly 的全部数据——排班规则、换班请假、导入历史、工资、上班流程与同步状态——回到首次启动的欢迎屏。不会动 Apple Calendar 里的事件和工作日志文件。";
+"Reset Shiftly…" = "重置 Shiftly…";
+"Erase all Shiftly data?" = "清除 Shiftly 的全部数据？";
+"Erase Everything" = "全部清除";
+"Cancel" = "取消";
+"This deletes Shiftly's files in the data folder and resets app settings. Apple Calendar events and work logs stay. This cannot be undone." = "将删除数据目录中 Shiftly 的文件并重置应用设置。Apple Calendar 事件与工作日志保留。此操作无法撤销。";
+"All Shiftly data erased. Calendar events and work logs were kept." = "Shiftly 数据已全部清除；日历事件与工作日志已保留。";
+"Reset failed: %@" = "重置失败：%@";
+
+/* Holidays */
+"Holidays" = "公共假期";
+"No shifts are scheduled on holidays. Swapping a shift onto a holiday on purpose still works." = "节假日不排班；明确把班换到节假日的换班仍然生效。";
+"Name (optional)" = "名称（可选）";
+"Import from a holidays calendar" = "从节假日日历导入";
+"Import Holidays" = "导入节假日";
+"Upcoming Holidays" = "即将到来的假期";
+"Remove holiday" = "删除假期";
+"Holiday added." = "假期已添加。";
+"Holiday removed." = "假期已删除。";
+"Holiday save failed: %@" = "假期保存失败：%@";
+"This holiday range already exists." = "该假期区间已存在。";
+"Imported %lld holidays." = "已导入 %lld 个节假日。";
+"Holiday import failed." = "节假日导入失败。";
+
+/* Calendar holidays + widget sync */
+"Public holiday — no shift is scheduled. Manage under Shift → Holidays." = "公共假期——该日不排班。请到「排班 → 公共假期」管理。";
+"Holiday" = "节假日";
+
+/* Unpaid break */
+"Unpaid break" = "无薪休息";
+"min / shift" = "分钟 / 每班";
+"Unpaid break saved." = "无薪休息已保存。";
+"Subtracted from every shift's paid hours — e.g. 10:00–18:30 with a 30 min break pays 8 h." = "从每班的计薪时长中扣除——例如 10:00–18:30 含 30 分钟休息，计薪 8 小时。";
+
+/* Daily log vs quick notes */
+"Daily Log" = "工作日志";
+"Daily log — appended with a timestamp" = "工作日志——带时间戳追加";
+"No shift today — entries go to %@, the last workday." = "今天没有排班——记录会写入上一个工作日 %@ 的日志。";
+"Quick Notes" = "快速笔记";
+"Quick note" = "快速笔记";
+"Note title" = "笔记标题";
+"Note title — creates dd-mm-yy | title.md and opens it" = "笔记标题——创建 dd-mm-yy | 标题.md 并打开";
+"Create" = "创建";
+"No notes yet." = "还没有笔记。";
+"Note create failed: %@" = "笔记创建失败：%@";
+"Daily Markdown logs live in a folder you own — one file per shift day (dd-mm-yy.md) with the shift pre-filled, plus standalone quick notes (dd-mm-yy | title.md), editable with any app." = "Markdown 日志存放在你自己的文件夹——每个班一个文件（dd-mm-yy.md，预填班次信息），另有独立快速笔记（dd-mm-yy | 标题.md），任何 app 均可编辑。";
+
+/* Log page redesign + in-app editor */
+"Edit" = "编辑";
+"New Note" = "新建笔记";
+"Open in VS Code" = "在 VS Code 打开";
+"Open in Shiftly" = "在 Shiftly 内打开";
+"Saved." = "已保存。";
+"Save failed." = "保存失败。";
+"no shift today — last workday" = "今天无班——记入上一个工作日";
+"Quick entry — appended with a timestamp" = "快速打卡——带时间戳追加";
+"No log for this day yet — Edit opens the editor, or add a quick entry above." = "这一天还没有日志——点「编辑」打开编辑器，或在上方快速打卡。";
+"Standalone notes — dd-mm-yy | title.md" = "独立笔记——dd-mm-yy | 标题.md";
+"Search logs and notes as you type" = "输入即搜索日志与笔记";
+"Daily Logs" = "工作日志";
+"Daily Log — %@" = "工作日志 — %@";
+"Past" = "过往";
+"Upcoming" = "即将到来";
+"Logs" = "日志";
+"No logs yet." = "还没有日志。";
+"Daily Logs (%lld)" = "工作日志 (%lld)";
+"Quick Notes (%lld)" = "快速笔记 (%lld)";
+"Quick Notes Folder" = "快速笔记目录";
+"New notes go to the new folder; existing files are neither moved nor deleted." = "新笔记会写入新目录；既有文件不会被移动或删除。";
+"Notes folder updated. Existing notes stay in the old folder." = "笔记目录已更新；既有笔记保留在旧目录。";
+"Could not save notes folder: %@" = "保存笔记目录失败：%@";
+"Choose the folder for your quick notes." = "选择存放快速笔记的文件夹。";
+
+/* Meetings */
+"Meetings" = "会议";
+"Record a meeting" = "录制会议";
+"Recording…" = "录音中…";
+"Audio lands in a timestamped folder; Scripto adds the transcript next to it." = "音频存入按时间戳命名的文件夹；Scripto 的转录文件会生成在旁边。";
+"No meetings yet — hit record." = "还没有会议——点击录音开始。";
+"Transcribe" = "转录";
+"Translate" = "翻译";
+"Move meeting to Trash" = "把会议移到废纸篓";
+"Meeting moved to Trash." = "会议已移到废纸篓。";
+"Delete failed: %@" = "删除失败：%@";
+"Recording saved." = "录音已保存。";
+"Could not start recording." = "无法开始录音。";
+"Could not start recording: %@" = "无法开始录音：%@";
+"Microphone access denied. Grant it in System Settings → Privacy & Security → Microphone." = "麦克风权限被拒绝。请在 系统设置 → 隐私与安全性 → 麦克风 中授权。";
+"No recording in this meeting folder." = "该会议文件夹中没有录音。";
+"Set the Scripto folder in Settings first." = "请先在设置中指定 Scripto 目录。";
+"Transcribing…" = "转录中…";
+"Translating…" = "翻译中…";
+"Transcript ready." = "转录完成。";
+"Translation ready." = "翻译完成。";
+"Scripto failed: %@" = "Scripto 运行失败：%@";
+"Meetings folder updated." = "会议目录已更新。";
+"Scripto folder saved." = "Scripto 目录已保存。";
+"Recordings folder" = "录音目录";
+"Scripto folder" = "Scripto 目录";
+"Not set" = "未设置";
+"Translate to" = "翻译目标";
+"Transcribe / Translate run Scripto's CLI headlessly (uv run scripto-cli); subtitles land next to each recording." = "转录/翻译 通过 Scripto 的命令行无界面运行（uv run scripto-cli）；字幕文件生成在每段录音旁边。";
+"Choose the folder for meeting recordings." = "选择存放会议录音的文件夹。";
+"Choose your Scripto checkout (the folder with pyproject.toml)." = "选择你的 Scripto 项目目录（含 pyproject.toml）。";
+"No transcript yet." = "还没有转录。";
+"Use Transcribe / Translate in the meeting list; the subtitles appear here once Scripto finishes." = "在会议列表中点 转录/翻译；Scripto 完成后字幕会显示在这里。";
+"No recording file in this folder." = "该文件夹中没有录音文件。";
+"Transcript" = "转录";

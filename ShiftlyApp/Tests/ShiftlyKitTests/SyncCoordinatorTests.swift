@@ -163,6 +163,23 @@ private struct TempRoot {
         #expect(calendar.storage.count == 2)
     }
 
+    @Test func calendarIdentifierIsPersistedInState() throws {
+        let tmp = try TempRoot()
+        defer { tmp.destroy() }
+        let provider = StubProvider(
+            store: tmp.store,
+            baseDates: ["2026-07-20"],
+            range: ("2026-07-01", "2026-08-31")
+        )
+        let coordinator = SyncCoordinator(
+            store: tmp.store, stateStore: tmp.stateStore,
+            calendar: InMemoryCalendarStore(), provider: provider,
+            calendarIdentifier: "CAL-123"
+        )
+        _ = try coordinator.sync()
+        #expect(tmp.stateStore.load().calendar_id == "CAL-123")
+    }
+
     @Test func failureIsRecordedInMeta() throws {
         struct FailingProvider: ScheduleProvider {
             func plannedDays(start: String, end: String) throws -> [PlannedDay] {

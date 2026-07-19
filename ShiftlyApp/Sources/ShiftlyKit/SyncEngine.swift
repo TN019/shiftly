@@ -27,10 +27,23 @@ public enum SyncEngine {
     ) -> SyncPlan {
         var plan = SyncPlan()
 
-        let plannedByDate = Dictionary(planned.map { ($0.date, $0) }, uniquingKeysWith: { a, _ in a })
-        var entriesByDate = Dictionary(state.entries.map { ($0.date, $0) }, uniquingKeysWith: { a, _ in a })
         let eventsByID = Dictionary(events.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        let managedIDs = Set(state.entries.map(\.event_id))
+
+        // State-loss guard: several events tracked and *none* of them exist
+        // any more means the calendar was deleted, recreated or swapped —
+        // not the user deleting individual shifts. Recover by dropping the
+        // stale state (re-claim/create below) instead of reading back a
+        // leave for every planned day. A single missing event is still an
+        // honest per-day deletion.
+        var stateEntries = state.entries
+        if stateEntries.count >= 2,
+           !stateEntries.contains(where: { eventsByID[$0.event_id] != nil }) {
+            stateEntries = []
+        }
+
+        let plannedByDate = Dictionary(planned.map { ($0.date, $0) }, uniquingKeysWith: { a, _ in a })
+        var entriesByDate = Dictionary(stateEntries.map { ($0.date, $0) }, uniquingKeysWith: { a, _ in a })
+        let managedIDs = Set(stateEntries.map(\.event_id))
 
         // -- Claim pass: adopt unmanaged shift-title events on planned days
         //    that have no entry yet (state loss or legacy migration).

@@ -18,6 +18,7 @@
 | `data/config.json` | 人 / AI / App | 排班规则、班次类型、日历名、日志目录 |
 | `data/swaps.json` | 人 / AI / App / 同步回读 | 换班记录 |
 | `data/leave.json` | 人 / AI / App / 同步回读 | 请假区间 |
+| `data/holidays.json` | 人 / AI / App | 公共假期（不排班） |
 | `data/overrides.json` | 同步回读（AI 可删条目=撤销） | 单日时间覆盖 |
 | `data/manual_shifts.json` | 同步回读（AI 可删条目=撤销） | 日历里手建的单次班 |
 | `data/pay.json` | 人 / AI / App | 薪资模型 |
@@ -26,7 +27,11 @@
 | `data/sync_state.json` | **禁止手改**（引擎私有） | 事件映射 |
 | `data/last_sync_report.json` | **禁止手改**（引擎私有） | 最近同步报告 |
 | `data/readback_log.json` | **禁止手改**（引擎私有） | 回读日志（App 内撤销用） |
-| `<log_dir>/YYYY/YYYY-MM-DD.md` | 人 / AI / App | 工作日志（见 §2） |
+| `<log_dir>/dd-mm-yy.md` | 人 / AI / App | 工作日志，一班一文件（见 §2） |
+| `<meetings_dir>/dd-mm-yy \| hh-mm/` | 人 / App / Scripto | 会议：录音 `dd-mm-yy.mp4` + Scripto 字幕 `*.{en,zh}.srt`（见 §2.5） |
+
+App 的 Settings → Reset 删除上表 `data/` 下的全部 Shiftly 文件并重置应用偏好；
+`data/` 中的非 Shiftly 文件、工作日志与 Apple Calendar 事件一律保留。
 
 ## 1. 数据文件 Schema
 
@@ -126,6 +131,21 @@
 **请假在换班之后应用**（换入请假日的班会被吞掉）。日历侧删除事件会回读为单日请假
 （start_date == end_date）。
 
+### 1.2b holidays.json（公共假期）
+
+```json
+{ "type": "array", "items": { "type": "object",
+  "required": ["start_date", "end_date", "name"],
+  "properties": { "start_date": { "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+                  "end_date":   { "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+                  "name":       { "type": "string" } } } }
+```
+
+语义：区间含双端，单日假期 start_date == end_date。节假日取消规则生成的班
+（**在换班之前应用**，因此明确换到节假日的班仍生效；请假仍最后应用）。
+工作历史 Day N 计数同样排除节假日。App 可从任一日历（如订阅的节假日日历）
+一键导入——跨多天的全天事件成为一个区间，起始日已存在的条目不覆盖。
+
 ### 1.3 overrides.json（单日时间覆盖）与 manual_shifts.json（单次班）
 
 ```json
@@ -147,6 +167,9 @@
 
 两者主要由**日历回读**产生（用户在 Apple Calendar 改时/新建）。AI 通常不新增；
 删除某条目 = 撤销该回读（App 的 Sync Report 卡片有同款按钮）。每日期至多一条。
+`source: "import"` 的条目来自 Settings 的历史导入：所选日历今天之前的事件按真实
+起止时间落盘；全天事件用 config 默认班时，重复事件的每次过去发生各记一天，
+同日多个定时事件合并为一段；已有日期一律不覆盖（重复导入幂等）。
 
 ### 1.4 pay.json（casual 平率薪资模型）
 
@@ -163,7 +186,8 @@
         "properties": { "effective_from": { "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
                         "hourly": { "type": "number", "exclusiveMinimum": 0 } } }
     },
-    "display_rates": { "type": "object", "additionalProperties": { "type": "number" } }
+    "display_rates": { "type": "object", "additionalProperties": { "type": "number" } },
+    "unpaid_break_minutes": { "type": "integer", "minimum": 0 }
   }
 }
 ```
@@ -212,7 +236,15 @@ path 打开文件/文件夹（~ 展开）；command 经 `/bin/zsh -lc` 执行（
 
 ## 2. 工作日志
 
-- 位置：`config.log_dir`（缺省 `~/Documents/ShiftlyLogs`），布局 `YYYY/YYYY-MM-DD.md`。
+- 位置：`config.log_dir`（缺省 `~/Documents/ShiftlyLogs`），文件名 `dd-mm-yy.md`
+  平铺（2026-07-19 → `19-07-26.md`，与班次日期一一对应）；旧版 `YYYY/YYYY-MM-DD.md`
+  布局的文件仍可读且续写在原文件（同一天绝不分裂成两个文件）。
+- **默认日期**（GUI 快速记录与 CLI 未传 `--date` 时）：今天有班记今天；
+  今天无班则记最近一个工作日（周日复盘落进周六的班日志）。
+- **快速笔记**：独立文件 `dd-mm-yy | 标题.md`（存放在 `config.notes_dir`，
+  缺省 `<log_dir>/notes`；标题中的 `/ : \` 替换为 `-`），
+  仅含 frontmatter，正文归用户；文件名中的 ` | ` 是笔记标记，
+  永不计入工作日志（搜索/月历标记只看日志）。
 - 新文件自动带 frontmatter；**已存在的文件 Shiftly 只追加、绝不重建**：
 
 ```markdown
@@ -227,6 +259,16 @@ tags: []
 ```
 
 - 正文是自由 Markdown，任何编辑器可改；App 的搜索会命中 frontmatter 与正文。
+
+### 2.5 会议（Meetings）
+
+- 目录：`config.meetings_dir`（缺省 `~/Documents/ShiftlyMeetings`）。每次录音生成
+  `dd-mm-yy | hh-mm/`（开始时间戳；macOS 文件名冒号保留，故用 `hh-mm`），
+  内含录音 `dd-mm-yy.mp4`（AAC）。
+- 转录/翻译由 App 无界面调用 Scripto：`cd <config.scripto_dir> && uv run scripto-cli
+  run <音频> --format srt [--translate --target <config.translate_target|zh>]`；
+  字幕 `<名>.<lang>.srt` 由 Scripto 写在录音旁，App 只读——列表、播放与按时间戳
+  高亮均在 App 内完成。
 
 ## 3. `shiftly` CLI 参考
 
@@ -243,6 +285,7 @@ tags: []
 | `swap list` | — | `{swaps[{index,…}]}` |
 | `swap remove` | `<index>` | `{swaps[]}` |
 | `leave add / list / remove` | `--start D --end D` / — / `<index>` | `{leave[…]}` |
+| `holiday add / list / remove` | `--start D [--end D] [--name S]` / — / `<index>` | `{holidays[…]}` |
 | `shifts list` | `--from D --to D` | `{shifts[{date,kind,start,end,hours}]}` |
 | `pay report` | `--month YYYY-MM` | `{month,currency,total_hours,total_amount,has_unrated_shifts,items[]}` |
 | `log append` | `"text" [--date D]` | `{date,path}` |
@@ -265,9 +308,10 @@ shiftly-cli sync now
 ## 4. Shiftly MCP server
 
 `packages/mcp-server/`（node + zod，stdio），每个工具 = 一次 CLI 调用；
-工具面共 13 个：get_schedule / set_schedule / list_shifts / add_swap /
-add_leave / list_overrides / remove_override / pay_report / log_append /
-log_read / routine_show / routine_run / sync_now。详见 packages/mcp-server/README.md。
+工具面共 16 个：get_schedule / set_schedule / list_shifts / add_swap /
+add_leave / list_overrides / remove_override / list_holidays / add_holiday /
+remove_holiday / pay_report / log_append / log_read / routine_show /
+routine_run / sync_now。详见 packages/mcp-server/README.md。
 
 注册示例（SHIFTLY_ROOT 指数据目录；CLI 路径缺省自动探测，也可用 SHIFTLY_CLI 指定）：
 

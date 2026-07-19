@@ -2,16 +2,18 @@ import ShiftlyKit
 import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable {
-    case today, calendar, pay, log, settings
+    case today, shift, calendar, pay, log, meetings, settings
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .today: return "Today"
+        case .shift: return "Shift"
         case .calendar: return "Calendar"
         case .pay: return "Pay"
         case .log: return "Log"
+        case .meetings: return "Meetings"
         case .settings: return "Settings"
         }
     }
@@ -19,9 +21,11 @@ enum AppSection: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .today: return "sun.max"
+        case .shift: return "calendar.badge.clock"
         case .calendar: return "calendar"
         case .pay: return "dollarsign.circle"
         case .log: return "text.book.closed"
+        case .meetings: return "mic"
         case .settings: return "gearshape"
         }
     }
@@ -31,7 +35,9 @@ struct ContentView: View {
     @ObservedObject var model: AppModel
     @FocusState var timeFocus: TimeField?
     @FocusState var historySearchFocused: Bool
-    @State var overridesListExpanded = false
+    @State var swapPastExpanded = false
+    @State var leavePastExpanded = false
+    @State var holidaysPastExpanded = false
     @State var historyExpanded = false
     @State var historyDateSearch = ""
     @State var historyPeriod: HistoryPeriodFilter = .all
@@ -48,18 +54,19 @@ struct ContentView: View {
     @State var paySetupHourly = ""
     @State var paySetupDate = Date()
     @State var payNewRate = ""
+    @State var payBreakMinutes = ""
     @State var payNewRateDate = Date()
     @State var payExchangeEdits: [String: String] = [:]
     @AppStorage("shiftly.payDisplayCurrency") var payDisplayCurrency = "AUD"
     @State var paySelectedMonth: String? = nil
     @State var logQuickText = ""
-    @State var logShowRaw = false
     @State var logSearchQuery = ""
-    @State var logSearchUseRange = false
-    @State var logSearchFrom = Calendar.current.date(byAdding: .month, value: -3, to: Date()) ?? Date()
-    @State var logSearchTo = Date()
-    @State var logSearchRan = false
+    @State var logsListShowsNotes = false
     @State var importCalendarID = ""
+    @State var todaySwapTarget = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+    @State private var showResetConfirm = false
+    @State var holidayImportCalendarID = ""
+    @State var holidaysListExpanded = false
     @AppStorage("shiftly.section") private var storedSection = AppSection.today.rawValue
 
     private var sectionSelection: Binding<AppSection?> {
@@ -131,7 +138,7 @@ struct ContentView: View {
                 } else {
                     NavigationSplitView {
                         List(AppSection.allCases, selection: sectionSelection) { section in
-                            Label(section.label, systemImage: section.systemImage)
+                            Label(L(section.label), systemImage: section.systemImage)
                                 .tag(section)
                         }
                         .navigationSplitViewColumnWidth(min: 165, ideal: 185, max: 230)
@@ -192,9 +199,11 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 14) {
                 switch section {
                 case .today: todayPage
+                case .shift: shiftPage
                 case .calendar: calendarPage
                 case .pay: payPage
                 case .log: logPage
+                case .meetings: meetingsPage
                 case .settings: settingsPage
                 }
                 if !model.statusMessage.isEmpty {
@@ -233,10 +242,17 @@ struct ContentView: View {
         header
         nextShiftCard
         routineCard
-        weeklySection
-        overridesSection
+        adjustTodayCard
         syncReportSection
+    }
+
+    @ViewBuilder
+    private var shiftPage: some View {
         actions
+        weeklySection
+        swapSection
+        leaveSection
+        holidaysSection
     }
 
     @ViewBuilder
@@ -403,6 +419,42 @@ struct ContentView: View {
         .sheet(isPresented: $showScheduleManager) {
             ScheduleManagerSheet(model: model)
         }
+    }
+
+    /// True while today still has a shift on the plan (upcoming later today
+    /// or in progress) — the precondition for "take today off" / "move it".
+    private var todayHasShift: Bool {
+        guard let shift = model.nextShift else { return false }
+        return Calendar.current.isDateInToday(shift.start)
+    }
+
+    private var adjustTodayCard: some View {
+        card("Adjust Today") {
+            if todayHasShift {
+                HStack(spacing: 10) {
+                    Button("Take Today Off") { model.takeLeaveToday() }
+                        .buttonStyle(.bordered)
+                    Divider().frame(height: 22)
+                    Text("Move today's shift to")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    styledDatePicker($todaySwapTarget)
+                    Button("Move") { model.swapToday(to: todaySwapTarget) }
+                        .buttonStyle(.bordered)
+                        .disabled(Calendar.current.isDateInToday(todaySwapTarget)
+                                  || todaySwapTarget < startOfToday)
+                    Spacer(minLength: 0)
+                }
+                Text("Both write through to Apple Calendar right away. Undo by removing the entry on the Shift page.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            } else {
+                Text("No shift scheduled today.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .environment(\.isEnabled, !model.isBusy)
     }
 
     private var actions: some View {
@@ -587,6 +639,86 @@ struct ContentView: View {
             Text("New logs go to the new folder; existing files are neither moved nor deleted.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
+        }
+
+        card("Meetings") {
+            HStack(spacing: 10) {
+                Text("Recordings folder").font(.caption).foregroundStyle(.secondary)
+                Text(model.meetingsDir)
+                    .font(.system(.caption, design: .monospaced))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 0)
+                Button("Change…") { chooseMeetingsFolder() }
+                    .buttonStyle(.bordered)
+            }
+            HStack(spacing: 10) {
+                Text("Scripto folder").font(.caption).foregroundStyle(.secondary)
+                Text(model.scriptoDir.isEmpty ? L("Not set") : model.scriptoDir)
+                    .font(.system(.caption, design: .monospaced))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 0)
+                Button("Change…") { chooseScriptoFolder() }
+                    .buttonStyle(.bordered)
+            }
+            HStack(spacing: 10) {
+                Text("Translate to").font(.caption).foregroundStyle(.secondary)
+                Picker("", selection: Binding(
+                    get: { model.translateTarget },
+                    set: { model.setTranslateTarget($0) }
+                )) {
+                    Text("中文").tag("zh")
+                    Text("English").tag("en")
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 110)
+                Spacer(minLength: 0)
+            }
+            Text("Transcribe / Translate run Scripto's CLI headlessly (uv run scripto-cli); subtitles land next to each recording.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+
+        card("Quick Notes Folder") {
+            HStack(spacing: 10) {
+                Text(model.notesDir)
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 0)
+                Button("Change…") { chooseNotesFolder() }
+                    .buttonStyle(.bordered)
+            }
+            Text("New notes go to the new folder; existing files are neither moved nor deleted.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+
+        card("Reset") {
+            Text("Erase all Shiftly data — schedule, overrides, imported history, pay, routine and sync state — and start over from the welcome screen. Apple Calendar events and work log files are not touched.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(role: .destructive) {
+                showResetConfirm = true
+            } label: {
+                Text("Reset Shiftly…")
+                    .foregroundStyle(.red)
+            }
+            .buttonStyle(.bordered)
+        }
+        .confirmationDialog(
+            "Erase all Shiftly data?",
+            isPresented: $showResetConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Erase Everything", role: .destructive) { model.resetAllData() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This deletes Shiftly's files in the data folder and resets app settings. Apple Calendar events and work logs stay. This cannot be undone.")
         }
     }
 

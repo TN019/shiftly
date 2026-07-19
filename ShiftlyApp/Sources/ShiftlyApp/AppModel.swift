@@ -1,21 +1,32 @@
 import AppKit
+import AVFoundation
 import EventKit
 import Foundation
 import ServiceManagement
 import ShiftlyKit
+import WidgetKit
 
 @MainActor
 final class AppModel: ObservableObject {
-    @Published var selectedDays: Set<String> = []
-    @Published var startTime = "10:00"
-    @Published var endTime = "18:30"
-    @Published var effectiveFrom = Date()
+    // Schedule editor state (Shift page). The folder watcher reloads config
+    // on any external file event (iCloud roots touch files constantly), and
+    // an unconditional refresh would wipe in-progress edits — so edits mark
+    // the editor dirty and loadConfig refreshes it only while clean.
+    @Published var selectedDays: Set<String> = [] { didSet { markScheduleEdited() } }
+    @Published var startTime = "10:00" { didSet { markScheduleEdited() } }
+    @Published var endTime = "18:30" { didSet { markScheduleEdited() } }
+    @Published var effectiveFrom = Date() { didSet { markScheduleEdited() } }
     @Published var swapFrom = Date()
     @Published var swapTo = Date()
     @Published var leaveStart = Date()
     @Published var leaveEnd = Date()
     @Published var swaps: [SwapItem] = []
     @Published var leaves: [LeaveItem] = []
+    @Published var holidays: [HolidayItem] = []
+    @Published var holidayStart = Date()
+    @Published var holidayEnd = Date()
+    @Published var holidayName = ""
+    @Published var holidayImportRunning = false
     @Published var syncState: SyncState = .unsynced
     @Published var lastSyncText = "-"
     @Published var statusMessage = ""
@@ -31,7 +42,13 @@ final class AppModel: ObservableObject {
     @Published var nextShift: PlannedShift?
     @Published var rules: [Rule] = []
     @Published var shiftTypes: [ShiftType] = []
-    @Published var selectedShiftType: String? = nil
+    @Published var selectedShiftType: String? = nil { didSet { markScheduleEdited() } }
+    private var applyingConfig = false
+    private var scheduleEditorDirty = false
+
+    private func markScheduleEdited() {
+        if !applyingConfig { scheduleEditorDirty = true }
+    }
     /// Engine-solved shifts for the month currently shown in the calendar
     /// page, keyed by YYYY-MM-DD. Same data source as sync (planner +
     /// overrides + manual), never a re-implementation.
@@ -40,9 +57,16 @@ final class AppModel: ObservableObject {
     @Published var payConfig: PayConfig?
     @Published var payCurrentMonth: PayBreakdown?
     @Published var logDir: String = (WorkLogStore.defaultDir as NSString).expandingTildeInPath
+    @Published var notesDir: String = (WorkLogStore.defaultDir as NSString).expandingTildeInPath + "/notes"
     @Published var logDirExists = false
-    /// Content of today's log file; nil = not created yet.
+    /// Content of the active daily log (today, or the last workday when
+    /// today has no shift); nil = not created yet.
     @Published var todayLogContent: String?
+    /// Standalone quick notes (`dd-mm-yy | title.md`), newest first.
+    @Published var quickNotes: [WorkLogStore.NoteRef] = []
+    @Published var noteSearchResults: [WorkLogStore.NoteRef] = []
+    /// Every day with a daily log, newest first (the Logs browser).
+    @Published var logDates: [String] = []
     /// Days with a log file in the calendar's displayed month.
     @Published var monthLogDates: Set<String> = []
     @Published var logSearchResults: [WorkLogStore.SearchHit] = []
@@ -56,6 +80,17 @@ final class AppModel: ObservableObject {
     /// Calendars available for history import (id, title).
     @Published var importCalendars: [ImportCalendar] = []
     @Published var importRunning = false
+    /// Meeting recordings + Scripto integration.
+    @Published var meetings: [MeetingStore.Meeting] = []
+    @Published var meetingsDir: String = (MeetingStore.defaultDir as NSString).expandingTildeInPath
+    @Published var scriptoDir: String = ""
+    @Published var translateTarget: String = "zh"
+    @Published var isRecording = false
+    @Published var recordingSeconds = 0
+    /// Meeting folders with a Scripto run in flight.
+    @Published var scriptoBusy: Set<String> = []
+    private var audioRecorder: AVAudioRecorder?
+    private var recordTimer: Timer?
 
     struct ImportCalendar: Identifiable, Equatable {
         let id: String
@@ -89,7 +124,7 @@ final class AppModel: ObservableObject {
     func startWatching() {
         watcher?.stop()
         guard paths.isValid else { return }
-        watcher = FolderWatcher(paths: ["\(paths.root)/data", logDir]) { [weak self] changed in
+        watcher = FolderWatcher(paths: ["\(paths.root)/data", logDir, notesDir]) { [weak self] changed in
             Task { @MainActor [weak self] in
                 self?.handleExternalChange(changed)
             }
@@ -132,6 +167,54 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Factory reset: delete every Shiftly-owned data file, forget all
+    /// shiftly.* preferences and return to the first-run welcome screen.
+    /// Apple Calendar events and work-log files are left untouched.
+    func resetAllData() {
+        guard paths.isValid else { return }
+        watcher?.stop()
+        watcher = nil
+        do {
+            try DataReset.wipeData(atRoot: paths.root)
+        } catch {
+            statusMessage = LF("Reset failed: %@", error.localizedDescription)
+            startWatching()
+            return
+        }
+        let defaults = UserDefaults.standard
+        for key in defaults.dictionaryRepresentation().keys where key.hasPrefix("shiftly.") {
+            defaults.removeObject(forKey: key)
+        }
+        paths = ShiftlyPaths(root: "")
+        applyingConfig = true
+        selectedDays = []
+        startTime = "10:00"
+        endTime = "18:30"
+        effectiveFrom = Date()
+        selectedShiftType = nil
+        applyingConfig = false
+        scheduleEditorDirty = false
+        rules = []
+        rulesSummary = ""
+        shiftTypes = []
+        swaps = []
+        leaves = []
+        monthShifts = [:]
+        nextShift = nil
+        workHistory = []
+        workHistoryNote = ""
+        payConfig = nil
+        payCurrentMonth = nil
+        payMonths = []
+        payYearToDate = 0
+        routine = []
+        lastReport = nil
+        readbackLog = []
+        lastSyncText = "-"
+        syncState = .unsynced
+        statusMessage = L("All Shiftly data erased. Calendar events and work logs were kept.")
+    }
+
     let dayOrder = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
     let dayLabels: [String: String] = [
         "MO": L("Mon"), "TU": L("Tue"), "WE": L("Wed"), "TH": L("Thu"),
@@ -146,6 +229,7 @@ final class AppModel: ObservableObject {
         loadConfig()
         swaps = (try? store.loadSwaps()) ?? []
         leaves = (try? store.loadLeaves()) ?? []
+        holidays = store.loadHolidays()
         loadMeta()
         loadSyncReport()
         refreshWorkHistory()
@@ -157,6 +241,7 @@ final class AppModel: ObservableObject {
         refreshPayMonth()
         refreshLogState()
         routine = store.loadRoutine()
+        refreshMeetings()
         if watcher == nil {
             startWatching()
         }
@@ -213,17 +298,30 @@ final class AppModel: ObservableObject {
     // MARK: Work log
 
     var logStore: WorkLogStore {
-        WorkLogStore(rootDir: logDir)
+        WorkLogStore(rootDir: logDir, notesDir: notesDir)
+    }
+
+    /// The date daily-log entries go to: today when today is a workday,
+    /// otherwise the most recent workday (a Sunday debrief belongs to
+    /// Saturday's shift). Falls back to today before any history exists.
+    var activeLogDate: String {
+        let today = Self.todayYMD()
+        return workHistory.last(where: { $0.ymd <= today })?.ymd ?? today
     }
 
     func refreshLogState() {
-        let configured = (try? store.loadConfig())?.log_dir ?? WorkLogStore.defaultDir
+        let config = try? store.loadConfig()
+        let configured = config?.log_dir ?? WorkLogStore.defaultDir
         logDir = (configured as NSString).expandingTildeInPath
+        notesDir = ((config?.notes_dir ?? logDir + "/notes") as NSString).expandingTildeInPath
         logDirExists = logStore.rootExists
-        todayLogContent = logStore.read(date: Self.todayYMD())
+        todayLogContent = logStore.read(date: activeLogDate)
+        quickNotes = logDirExists ? logStore.notes() : []
+        logDates = logDirExists ? logStore.allDates().sorted(by: >) : []
     }
 
-    /// Append a timestamped entry to today's log (created on demand).
+    /// Append a timestamped entry to the active daily log (created on
+    /// demand).
     func quickCapture(_ text: String) {
         noteOwnWrite()
         let entry = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -232,8 +330,9 @@ final class AppModel: ObservableObject {
             statusMessage = L("Create the log folder first.")
             return
         }
+        let date = activeLogDate
         Task { @MainActor in
-            guard await ensureTodayLog() != nil else {
+            guard await ensureLog(date: date) != nil else {
                 statusMessage = L("Could not create today's log.")
                 return
             }
@@ -241,12 +340,12 @@ final class AppModel: ObservableObject {
             do {
                 try logStore.append(
                     entry: entry,
-                    date: Self.todayYMD(),
+                    date: date,
                     timeHHMM: hhmm,
                     shift: nil,
                     shiftType: nil
                 )
-                todayLogContent = logStore.read(date: Self.todayYMD())
+                todayLogContent = logStore.read(date: date)
                 statusMessage = L("Logged.")
             } catch {
                 statusMessage = LF("Quick capture failed: %@", error.localizedDescription)
@@ -280,10 +379,23 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Ensure today's log exists (frontmatter pre-filled from the plan) and
+    /// Point config at a different quick-notes folder. Existing files are
+    /// neither moved nor deleted.
+    func adoptNotesDir(_ url: URL) {
+        noteOwnWrite()
+        do {
+            try store.saveNotesDir(url.path)
+            refreshLogState()
+            startWatching()
+            statusMessage = L("Notes folder updated. Existing notes stay in the old folder.")
+        } catch {
+            statusMessage = LF("Could not save notes folder: %@", error.localizedDescription)
+        }
+    }
+
+    /// Ensure a day's log exists (frontmatter pre-filled from the plan) and
     /// return its path; nil on failure.
-    func ensureTodayLog() async -> String? {
-        let today = Self.todayYMD()
+    func ensureLog(date: String) async -> String? {
         let syncPaths = paths
         let dir = logDir
         return await Task.detached(priority: .utility) { () -> String? in
@@ -291,12 +403,12 @@ final class AppModel: ObservableObject {
                 store: DataStore(paths: syncPaths),
                 provider: PlannerScriptProvider(root: syncPaths.root)
             )
-            let planned = (try? source.plannedShifts(start: today, end: today)) ?? []
+            let planned = (try? source.plannedShifts(start: date, end: date)) ?? []
             let days = (try? PlannerScriptProvider(root: syncPaths.root)
-                .plannedDays(start: today, end: today)) ?? []
+                .plannedDays(start: date, end: date)) ?? []
             let logStore = WorkLogStore(rootDir: dir)
             return try? logStore.ensureFile(
-                date: today,
+                date: date,
                 shift: planned.first,
                 shiftType: planned.first?.kind == .manual ? "manual" : days.first?.shiftType
             )
@@ -310,14 +422,261 @@ final class AppModel: ObservableObject {
             statusMessage = L("Create the log folder first.")
             return
         }
+        let date = activeLogDate
         Task { @MainActor in
-            if let path = await ensureTodayLog() {
-                todayLogContent = logStore.read(date: Self.todayYMD())
+            if let path = await ensureLog(date: date) {
+                todayLogContent = logStore.read(date: date)
                 NSWorkspace.shared.open(URL(fileURLWithPath: path))
             } else {
                 statusMessage = L("Could not create today's log.")
             }
         }
+    }
+
+    // MARK: Meetings
+
+    var meetingStore: MeetingStore { MeetingStore(rootDir: meetingsDir) }
+
+    func refreshMeetings() {
+        let config = try? store.loadConfig()
+        meetingsDir = config?.meetingsRoot ?? (MeetingStore.defaultDir as NSString).expandingTildeInPath
+        scriptoDir = config?.scripto_dir ?? ""
+        translateTarget = config?.translate_target ?? "zh"
+        meetings = meetingStore.meetings()
+    }
+
+    func adoptMeetingsDir(_ url: URL) {
+        noteOwnWrite()
+        do {
+            try store.saveMeetingSetting(key: "meetings_dir", value: url.path)
+            refreshMeetings()
+            statusMessage = L("Meetings folder updated.")
+        } catch {
+            statusMessage = LF("Save failed: %@", error.localizedDescription)
+        }
+    }
+
+    func adoptScriptoDir(_ url: URL) {
+        noteOwnWrite()
+        do {
+            try store.saveMeetingSetting(key: "scripto_dir", value: url.path)
+            refreshMeetings()
+            statusMessage = L("Scripto folder saved.")
+        } catch {
+            statusMessage = LF("Save failed: %@", error.localizedDescription)
+        }
+    }
+
+    func setTranslateTarget(_ target: String) {
+        noteOwnWrite()
+        try? store.saveMeetingSetting(key: "translate_target", value: target)
+        translateTarget = target
+    }
+
+    /// Start a meeting recording (AAC mono into the timestamped folder).
+    func startRecording() {
+        guard !isRecording else { return }
+        AVCaptureDevice.requestAccess(for: .audio) { granted in
+            Task { @MainActor in
+                guard granted else {
+                    self.statusMessage = L("Microphone access denied. Grant it in System Settings → Privacy & Security → Microphone.")
+                    return
+                }
+                self.beginRecording()
+            }
+        }
+    }
+
+    private func beginRecording() {
+        let now = Date()
+        let df = DateFormatter()
+        df.dateFormat = "HH:mm"
+        do {
+            let path = try meetingStore.newRecordingPath(
+                date: Self.todayYMD(), timeHHMM: df.string(from: now)
+            )
+            let recorder = try AVAudioRecorder(
+                url: URL(fileURLWithPath: path),
+                settings: [
+                    AVFormatIDKey: kAudioFormatMPEG4AAC,
+                    AVSampleRateKey: 44_100,
+                    AVNumberOfChannelsKey: 1,
+                    AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
+                ]
+            )
+            guard recorder.record() else {
+                statusMessage = L("Could not start recording.")
+                return
+            }
+            audioRecorder = recorder
+            isRecording = true
+            recordingSeconds = 0
+            recordTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    guard let self, self.isRecording else { return }
+                    self.recordingSeconds += 1
+                }
+            }
+            statusMessage = L("Recording…")
+        } catch {
+            statusMessage = LF("Could not start recording: %@", error.localizedDescription)
+        }
+    }
+
+    func stopRecording() {
+        guard isRecording else { return }
+        audioRecorder?.stop()
+        audioRecorder = nil
+        recordTimer?.invalidate()
+        recordTimer = nil
+        isRecording = false
+        refreshMeetings()
+        statusMessage = L("Recording saved.")
+    }
+
+    /// Run Scripto headlessly on a meeting's audio; the SRT lands next to
+    /// the recording and the list refreshes when the run finishes.
+    func runScripto(meeting: MeetingStore.Meeting, translate: Bool) {
+        guard let audio = meeting.audioPath else {
+            statusMessage = L("No recording in this meeting folder.")
+            return
+        }
+        let scripto = (scriptoDir as NSString).expandingTildeInPath
+        guard !scripto.isEmpty,
+              FileManager.default.fileExists(atPath: scripto + "/pyproject.toml") else {
+            statusMessage = L("Set the Scripto folder in Settings first.")
+            return
+        }
+        guard !scriptoBusy.contains(meeting.folder) else { return }
+        scriptoBusy.insert(meeting.folder)
+        statusMessage = translate ? L("Translating…") : L("Transcribing…")
+        let target = translateTarget
+        Task { @MainActor in
+            let result = await Task.detached(priority: .userInitiated) { () -> (ok: Bool, message: String) in
+                var command = "cd \(Self.shellQuote(scripto)) && uv run scripto-cli run \(Self.shellQuote(audio)) --format srt"
+                if translate {
+                    command += " --translate --target \(target)"
+                }
+                let proc = Process()
+                proc.executableURL = URL(fileURLWithPath: "/bin/zsh")
+                proc.arguments = ["-lc", command]
+                let errPipe = Pipe()
+                proc.standardError = errPipe
+                proc.standardOutput = Pipe()
+                do {
+                    try proc.run()
+                    proc.waitUntilExit()
+                    if proc.terminationStatus == 0 {
+                        return (true, "")
+                    }
+                    let err = String(
+                        data: errPipe.fileHandleForReading.readDataToEndOfFile(),
+                        encoding: .utf8
+                    )?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    return (false, err.split(separator: "\n").last.map(String.init) ?? "exit \(proc.terminationStatus)")
+                } catch {
+                    return (false, error.localizedDescription)
+                }
+            }.value
+            scriptoBusy.remove(meeting.folder)
+            refreshMeetings()
+            statusMessage = result.ok
+                ? (translate ? L("Translation ready.") : L("Transcript ready."))
+                : LF("Scripto failed: %@", result.message)
+        }
+    }
+
+    /// Single-quote a string for /bin/zsh -lc.
+    nonisolated static func shellQuote(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    func deleteMeeting(_ meeting: MeetingStore.Meeting) {
+        noteOwnWrite()
+        do {
+            try FileManager.default.trashItem(
+                at: URL(fileURLWithPath: meeting.folder), resultingItemURL: nil
+            )
+            refreshMeetings()
+            statusMessage = L("Meeting moved to Trash.")
+        } catch {
+            statusMessage = LF("Delete failed: %@", error.localizedDescription)
+        }
+    }
+
+    // MARK: In-app editor
+
+    /// Open the in-app editor on the active daily log (created on demand).
+    func editDailyLog() {
+        guard logDirExists else {
+            statusMessage = L("Create the log folder first.")
+            return
+        }
+        let date = activeLogDate
+        Task { @MainActor in
+            guard let path = await ensureLog(date: date) else {
+                statusMessage = L("Could not create today's log.")
+                return
+            }
+            todayLogContent = logStore.read(date: date)
+            LogEditorWindow.present(path: path, title: LF("Daily Log — %@", date), model: self)
+        }
+    }
+
+    /// Open the in-app editor on an existing note or log file.
+    func editFile(path: String, title: String) {
+        LogEditorWindow.present(path: path, title: title, model: self)
+    }
+
+    /// Open the in-app editor in new-note mode (also the widget entry).
+    func newQuickNote() {
+        guard logDirExists else {
+            statusMessage = L("Create the log folder first.")
+            return
+        }
+        LogEditorWindow.presentNewNote(model: self)
+    }
+
+    /// Create the quick-note file for the editor's first save.
+    /// Returns the path, or nil on failure.
+    func createQuickNoteFile(title: String, body: String) -> String? {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, logDirExists else { return nil }
+        noteOwnWrite()
+        do {
+            let path = try logStore.createNote(title: trimmed, date: Self.todayYMD(), body: body)
+            quickNotes = logStore.notes()
+            return path
+        } catch {
+            statusMessage = LF("Note create failed: %@", error.localizedDescription)
+            return nil
+        }
+    }
+
+    /// Persist editor content and refresh whatever shows the file.
+    func saveEditorContent(_ content: String, at path: String) -> Bool {
+        noteOwnWrite()
+        do {
+            try Data(content.utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
+            refreshLogState()
+            return true
+        } catch {
+            statusMessage = LF("Save failed: %@", error.localizedDescription)
+            return false
+        }
+    }
+
+    /// Open a file in VS Code when installed, the default editor otherwise.
+    func openInVSCode(path: String) {
+        let candidates = ["Visual Studio Code", "VSCodium", "Code"]
+        for name in candidates
+        where FileManager.default.fileExists(atPath: "/Applications/\(name).app") {
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            proc.arguments = ["-a", name, path]
+            if (try? proc.run()) != nil { return }
+        }
+        NSWorkspace.shared.open(URL(fileURLWithPath: path))
     }
 
     // MARK: Pay
@@ -384,6 +743,12 @@ final class AppModel: ObservableObject {
         config.rates.append(PayRate(effective_from: effectiveFrom, hourly: hourly))
         config.rates.sort { $0.effective_from < $1.effective_from }
         savePay(config, successMessage: L("Rate saved."))
+    }
+
+    func setUnpaidBreak(minutes: Int) {
+        guard var config = payConfig else { return }
+        config.unpaid_break_minutes = max(0, minutes)
+        savePay(config, successMessage: L("Unpaid break saved."))
     }
 
     func updateDisplayRates(_ rates: [String: Double]) {
@@ -466,12 +831,22 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func searchLogs(query: String, from: String?, to: String?) {
+    func searchLogs(query: String, from: String? = nil, to: String? = nil) {
         let dir = logDir
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            logSearchResults = []
+            noteSearchResults = []
+            return
+        }
         Task { @MainActor in
-            logSearchResults = await Task.detached(priority: .utility) {
-                WorkLogStore(rootDir: dir).search(query: query, from: from, to: to)
+            let (logs, notes) = await Task.detached(priority: .utility) { () -> ([WorkLogStore.SearchHit], [WorkLogStore.NoteRef]) in
+                let store = WorkLogStore(rootDir: dir)
+                return (store.search(query: trimmed, from: from, to: to),
+                        store.searchNotes(query: trimmed))
             }.value
+            logSearchResults = logs
+            noteSearchResults = notes
         }
     }
 
@@ -497,7 +872,43 @@ final class AppModel: ObservableObject {
             }.value
             let now = Date()
             nextShift = shifts.first { $0.end > now }
+            writeWidgetSnapshot(shifts: shifts.filter { $0.end > now })
             await rescheduleReminders(shifts: shifts)
+        }
+    }
+
+    /// Feed the native WidgetKit widgets: snapshot JSON in the shared group
+    /// container plus a timeline reload. The widget extension is sandboxed;
+    /// the group container is the one place both sides can reach.
+    private func writeWidgetSnapshot(shifts: [PlannedShift]) {
+        let dir = NSHomeDirectory() + "/Library/Group Containers/group.com.shiftly.app"
+        let dayFormat = Date.FormatStyle().weekday(.abbreviated).day().month(.abbreviated)
+        var payload: [String: Any] = [
+            "label": L("Next shift"),
+            "time": "—",
+            "sub": L("No upcoming shift in the next 45 days"),
+            "upcoming": shifts.prefix(4).map { shift in
+                [
+                    "day": shift.start.formatted(dayFormat),
+                    "time": "\(SyncFingerprint.hhmmString(for: shift.start)) – \(SyncFingerprint.hhmmString(for: shift.end))",
+                ]
+            },
+        ]
+        if let next = shifts.first {
+            payload["time"] = SyncFingerprint.hhmmString(for: next.start)
+            payload["sub"] = next.start > Date()
+                ? "\(next.start.formatted(dayFormat)) · \(next.start.formatted(.relative(presentation: .named)))"
+                : L("in progress")
+        }
+        do {
+            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
+            try data.write(to: URL(fileURLWithPath: dir + "/widget.json"), options: .atomic)
+        } catch {
+            return // widgets just keep their last snapshot
+        }
+        if #available(macOS 14.0, *) {
+            WidgetCenter.shared.reloadAllTimelines()
         }
     }
 
@@ -576,7 +987,12 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func saveSchedule() {
+    @discardableResult
+    func saveSchedule() -> Bool {
+        guard !selectedDays.isEmpty else {
+            statusMessage = L("Select at least one workday, then save.")
+            return false
+        }
         noteOwnWrite()
         do {
             let df = DateFormatter()
@@ -590,11 +1006,15 @@ final class AppModel: ObservableObject {
             )
             rules = updated.sorted { $0.effective_from < $1.effective_from }
             rulesSummary = Self.rulesSummary(from: rules)
+            // Disk now matches the editor; reloads may refresh it again.
+            scheduleEditorDirty = false
             syncState = .unsynced
             statusMessage = L("Schedule saved.")
             refreshNextShift()
+            return true
         } catch {
             statusMessage = LF("Save failed: %@", error.localizedDescription)
+            return false
         }
     }
 
@@ -751,14 +1171,17 @@ final class AppModel: ObservableObject {
                 let outcome = try await Task.detached(priority: .userInitiated) {
                     let store = DataStore(paths: syncPaths)
                     let config = try store.loadConfig()
+                    let stateStore = SyncStateStore(paths: syncPaths)
                     let calendar = try EKCalendarStore.locateOrCreateCalendar(
-                        named: config.calendar_name, in: ekStore
+                        named: config.calendar_name, in: ekStore,
+                        preferredID: stateStore.load().calendar_id
                     )
                     let coordinator = SyncCoordinator(
                         store: store,
-                        stateStore: SyncStateStore(paths: syncPaths),
+                        stateStore: stateStore,
                         calendar: EKCalendarStore(eventStore: ekStore, calendar: calendar),
-                        provider: PlannerScriptProvider(root: root)
+                        provider: PlannerScriptProvider(root: root),
+                        calendarIdentifier: calendar.calendarIdentifier
                     )
                     return try coordinator.sync()
                 }.value
@@ -791,13 +1214,124 @@ final class AppModel: ObservableObject {
     }
 
     func saveScheduleAndSync() {
-        saveSchedule()
-        syncNow()
+        if saveSchedule() {
+            syncNow()
+        }
+    }
+
+    // MARK: Today quick adjustments
+
+    /// One-click "not working today": a single-day leave, synced right away.
+    func takeLeaveToday() {
+        leaveStart = Date()
+        leaveEnd = Date()
+        addLeaveAndSync()
+    }
+
+    /// Move today's shift to another day: a swap, synced right away.
+    func swapToday(to target: Date) {
+        swapFrom = Date()
+        swapTo = target
+        addSwapAndSync()
     }
 
     func addSwapAndSync() {
         addSwap()
         syncNow()
+    }
+
+    // MARK: Holidays
+
+    @discardableResult
+    func addHoliday() -> Bool {
+        noteOwnWrite()
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        var start = df.string(from: holidayStart)
+        var end = df.string(from: holidayEnd)
+        if end < start { swap(&start, &end) }
+        guard !holidays.contains(where: { $0.start_date == start && $0.end_date == end }) else {
+            statusMessage = L("This holiday range already exists.")
+            return false
+        }
+        do {
+            var list = store.loadHolidays()
+            list.append(HolidayItem(
+                start_date: start,
+                end_date: end,
+                name: holidayName.trimmingCharacters(in: .whitespacesAndNewlines)
+            ))
+            try store.saveHolidays(list)
+            holidays = store.loadHolidays()
+            holidayName = ""
+            syncState = .unsynced
+            statusMessage = L("Holiday added.")
+            return true
+        } catch {
+            statusMessage = LF("Holiday save failed: %@", error.localizedDescription)
+            return false
+        }
+    }
+
+    func addHolidayAndSync() {
+        if addHoliday() {
+            syncNow()
+        }
+    }
+
+    func deleteHoliday(id: UUID) {
+        guard let item = holidays.first(where: { $0.id == id }) else { return }
+        noteOwnWrite()
+        do {
+            var list = store.loadHolidays()
+            list.removeAll { $0 == item }
+            try store.saveHolidays(list)
+            holidays = store.loadHolidays()
+            syncState = .unsynced
+            statusMessage = L("Holiday removed.")
+        } catch {
+            statusMessage = LF("Holiday save failed: %@", error.localizedDescription)
+        }
+    }
+
+    /// Import every day of a calendar (e.g. a subscribed public-holidays
+    /// calendar) as holidays, a couple of years ahead and the past for
+    /// correct work-history counting. Existing dates are kept.
+    func importHolidays(calendarID: String) {
+        guard !holidayImportRunning, paths.isValid else { return }
+        holidayImportRunning = true
+        noteOwnWrite()
+        let syncPaths = paths
+        let existing = store.loadHolidays()
+        Task { @MainActor in
+            defer { holidayImportRunning = false }
+            let ekStore = EKEventStore()
+            guard await CalendarAccess.request(using: ekStore) else {
+                statusMessage = L("Calendar access denied. Grant access in System Settings → Privacy & Security → Calendars, then sync again.")
+                return
+            }
+            let added: Int? = await Task.detached(priority: .userInitiated) {
+                let until = Calendar.current.date(byAdding: .year, value: 2, to: Date()) ?? Date()
+                let events = HistoryImporter.fetchEvents(
+                    calendarID: calendarID, in: ekStore, until: until
+                )
+                let (merged, added) = HistoryImporter.holidays(from: events, existing: existing)
+                do {
+                    try DataStore(paths: syncPaths).saveHolidays(merged)
+                    return added
+                } catch {
+                    return nil
+                }
+            }.value
+            noteOwnWrite()
+            if let added {
+                load()
+                syncState = .unsynced
+                statusMessage = LF("Imported %lld holidays.", added)
+            } else {
+                statusMessage = L("Holiday import failed.")
+            }
+        }
     }
 
     func addLeaveAndSync() {
@@ -830,6 +1364,8 @@ final class AppModel: ObservableObject {
             }.value
             workHistory = result.rows
             workHistoryNote = result.note
+            // The active daily-log date depends on the latest workday.
+            refreshLogState()
         }
     }
 
@@ -840,20 +1376,25 @@ final class AppModel: ObservableObject {
                 statusMessage = L("Config invalid: calendar_name is empty.")
                 return
             }
-            startTime = config.default_start_time
-            endTime = config.default_end_time
             calendarName = config.calendar_name
             eventTitle = config.event_title
             let sorted = config.rules.sorted { $0.effective_from < $1.effective_from }
             rules = sorted
             shiftTypes = config.shift_types ?? []
-            // Edit the newest rule; older ones are history and must be kept.
-            if let latest = sorted.last {
-                selectedDays = Set(latest.workdays)
-                selectedShiftType = latest.shift_type
-                let df = DateFormatter()
-                df.dateFormat = "yyyy-MM-dd"
-                effectiveFrom = df.date(from: latest.effective_from) ?? Date()
+            // Refresh the editor from disk only while it has no in-progress
+            // edits. Edit the newest rule; older ones are history.
+            if !scheduleEditorDirty {
+                applyingConfig = true
+                startTime = config.default_start_time
+                endTime = config.default_end_time
+                if let latest = sorted.last {
+                    selectedDays = Set(latest.workdays)
+                    selectedShiftType = latest.shift_type
+                    let df = DateFormatter()
+                    df.dateFormat = "yyyy-MM-dd"
+                    effectiveFrom = df.date(from: latest.effective_from) ?? Date()
+                }
+                applyingConfig = false
             }
             rulesSummary = Self.rulesSummary(from: sorted)
             if let v = config.config_version, v > 2 {
@@ -951,11 +1492,19 @@ final class AppModel: ObservableObject {
                 return
             }
             let today = Self.todayYMD()
+            let cfg = try? DataStore(paths: syncPaths).loadConfig()
+            let (defaultStart, defaultEnd) = (
+                cfg?.default_start_time ?? "09:00",
+                cfg?.default_end_time ?? "17:00"
+            )
             let summary: HistoryImporter.Summary? = await Task.detached(priority: .userInitiated) {
                 let events = HistoryImporter.fetchEvents(
                     calendarID: calendarID, in: ekStore, until: Date()
                 )
-                let (shifts, merged) = HistoryImporter.shifts(from: events, before: today)
+                let (shifts, merged) = HistoryImporter.shifts(
+                    from: events, before: today,
+                    defaultStart: defaultStart, defaultEnd: defaultEnd
+                )
                 return try? HistoryImporter.apply(
                     shifts, mergedDays: merged, to: DataStore(paths: syncPaths)
                 )

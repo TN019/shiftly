@@ -28,7 +28,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from schedule_core import planned_days_detailed, read_json, repo_root, sync_range
+from schedule_core import (
+    earliest_anchor_date,
+    holiday_dates,
+    manual_shift_dates,
+    planned_days_detailed,
+    read_json,
+    repo_root,
+    resolve_history_path,
+    sync_range,
+)
 
 
 def parse_iso(value: str) -> dt.date:
@@ -56,11 +65,13 @@ def append_json_item(path: Path, item: dict) -> None:
 def cmd_shifts(root: Path, args) -> None:
     cfg = read_json(root / "data/config.json", {})
     swaps, leave = load_overrides(root)
-    for day in planned_days_detailed(cfg, swaps, leave, args.start, args.end):
+    holidays = holiday_dates(root)
+    for day in planned_days_detailed(cfg, swaps, leave, args.start, args.end, holidays):
         print(f"{day['date'].isoformat()}|{day['source']}|{day['shift_type']}")
 
 
 def cmd_sync_range(root: Path, _args) -> None:
+    cfg = read_json(root / "data/config.json", {})
     swaps, leave = load_overrides(root)
     mode = (
         os.environ.get("SHIFTLY_SYNC_MODE")
@@ -68,7 +79,11 @@ def cmd_sync_range(root: Path, _args) -> None:
         or os.environ.get("SHIFTFLOW_SYNC_MODE")  # legacy
         or ""
     )
-    first, last = sync_range(swaps, leave, mode=mode)
+    earliest = earliest_anchor_date(cfg, resolve_history_path(root, cfg))
+    manual = manual_shift_dates(root)
+    if manual:
+        earliest = min(earliest, min(manual))
+    first, last = sync_range(swaps, leave, mode=mode, earliest=earliest)
     print(first.isoformat())
     print(last.isoformat())
 

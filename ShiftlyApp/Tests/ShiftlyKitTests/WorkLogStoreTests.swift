@@ -19,9 +19,34 @@ private func dayShift(_ date: String) -> PlannedShift {
         let store = WorkLogStore(rootDir: dir)
 
         let path = try store.ensureFile(date: "2026-07-17", shift: dayShift("2026-07-17"), shiftType: "day")
-        #expect(path == "\(dir)/2026/2026-07-17.md")
+        #expect(path == "\(dir)/17-07-26.md")
         let content = store.read(date: "2026-07-17")!
         #expect(content.hasPrefix("---\ndate: 2026-07-17\nshift: day\nhours: 8.5\ntags: []\n---\n"))
+    }
+
+    @Test func fileNameMapsToShiftDateBothWays() {
+        #expect(WorkLogStore.fileName(for: "2026-07-19") == "19-07-26.md")
+        #expect(WorkLogStore.date(fromFileName: "19-07-26.md") == "2026-07-19")
+        #expect(WorkLogStore.date(fromFileName: "notes.md") == nil)
+        #expect(WorkLogStore.date(fromFileName: "2026-07-19.md") == nil, "legacy name is not the flat layout")
+    }
+
+    @Test func legacyYearFolderFilesStayReadableAndAppendable() throws {
+        let dir = tempLogDir()
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        try FileManager.default.createDirectory(atPath: dir + "/2026", withIntermediateDirectories: true)
+        let legacy = dir + "/2026/2026-07-17.md"
+        try Data("---\ndate: 2026-07-17\n---\n".utf8).write(to: URL(fileURLWithPath: legacy))
+        let store = WorkLogStore(rootDir: dir)
+
+        #expect(store.exists(date: "2026-07-17"))
+        #expect(store.resolvedPath(for: "2026-07-17") == legacy)
+        try store.append(entry: "still here", date: "2026-07-17", timeHHMM: "09:00",
+                         shift: nil, shiftType: nil)
+        #expect(store.read(date: "2026-07-17")!.hasSuffix("- 09:00 still here\n"))
+        #expect(!FileManager.default.fileExists(atPath: dir + "/17-07-26.md"),
+                "no second file for the same day")
+        #expect(store.datesWithLogs(inMonth: "2026-07") == ["2026-07-17"])
     }
 
     @Test func frontmatterWithoutShift() throws {
@@ -72,6 +97,36 @@ private func dayShift(_ date: String) -> PlannedShift {
         try store.ensureFile(date: "2026-08-01", shift: nil, shiftType: nil)
         #expect(store.datesWithLogs(inMonth: "2026-07") == ["2026-07-01", "2026-07-15"])
         #expect(store.datesWithLogs(inMonth: "2026-06").isEmpty)
+    }
+
+    @Test func quickNotesRoundTripAndStayApartFromDailyLogs() throws {
+        let dir = tempLogDir()
+        defer { try? FileManager.default.removeItem(atPath: dir) }
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        let store = WorkLogStore(rootDir: dir)
+
+        #expect(WorkLogStore.noteFileName(date: "2026-07-19", title: "买工作鞋") == "19-07-26 | 买工作鞋.md")
+        #expect(WorkLogStore.noteFileName(date: "2026-07-19", title: "a/b:c") == "19-07-26 | a-b-c.md",
+                "filesystem-unsafe characters sanitized")
+
+        let path = try store.createNote(title: "买工作鞋", date: "2026-07-19")
+        #expect(path.hasSuffix("/notes/19-07-26 | 买工作鞋.md"), "notes live in their own folder")
+        #expect(try store.createNote(title: "买工作鞋", date: "2026-07-19") == path,
+                "same day + title returns the existing note")
+        try store.createNote(title: "roster idea", date: "2026-07-20")
+        try store.ensureFile(date: "2026-07-19", shift: nil, shiftType: nil)
+
+        let notes = store.notes()
+        #expect(notes.map(\.title) == ["roster idea", "买工作鞋"], "newest first")
+        #expect(notes.map(\.date) == ["2026-07-20", "2026-07-19"])
+        #expect(store.allDates() == ["2026-07-19"], "notes never count as daily logs")
+        #expect(store.datesWithLogs(inMonth: "2026-07") == ["2026-07-19"])
+
+        // A dedicated notes folder overrides the default subfolder.
+        let separate = WorkLogStore(rootDir: dir, notesDir: dir + "/elsewhere")
+        try separate.createNote(title: "own dir", date: "2026-07-21")
+        #expect(separate.notes().map(\.title) == ["own dir"])
+        #expect(separate.notes().first?.path.contains("/elsewhere/") == true)
     }
 
     @Test func missingRootReportsNotExists() {

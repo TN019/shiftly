@@ -42,6 +42,14 @@ public struct Config: Codable {
     public var shift_types: [ShiftType]?
     /// Work-log folder (M5); nil = WorkLogStore.defaultDir.
     public var log_dir: String?
+    /// Quick-notes folder; nil = "<log_dir>/notes".
+    public var notes_dir: String?
+    /// Meeting recordings folder; nil = MeetingStore.defaultDir.
+    public var meetings_dir: String?
+    /// Scripto checkout used for transcription; nil = not configured.
+    public var scripto_dir: String?
+    /// Scripto translation target ("zh"/"en"); nil = "zh".
+    public var translate_target: String?
 
     /// Times for a shift-type id: matching type, else config defaults.
     public func times(forShiftType id: String?) -> (start: String, end: String) {
@@ -49,6 +57,30 @@ public struct Config: Codable {
             return (type.start, type.end)
         }
         return (default_start_time, default_end_time)
+    }
+}
+
+public struct HolidayItem: Codable, Identifiable, Equatable {
+    // Stable in-memory identity; not part of the JSON file format.
+    public var id = UUID()
+    /// Inclusive range; a single-day holiday has start_date == end_date.
+    public var start_date: String
+    public var end_date: String
+    public var name: String
+
+    private enum CodingKeys: String, CodingKey {
+        case start_date, end_date, name
+    }
+
+    public init(start_date: String, end_date: String, name: String) {
+        self.start_date = start_date
+        self.end_date = end_date
+        self.name = name
+    }
+
+    // id is in-memory identity only; equality is about content.
+    public static func == (lhs: HolidayItem, rhs: HolidayItem) -> Bool {
+        lhs.start_date == rhs.start_date && lhs.end_date == rhs.end_date && lhs.name == rhs.name
     }
 }
 

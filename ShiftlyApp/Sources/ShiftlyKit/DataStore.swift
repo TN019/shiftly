@@ -25,6 +25,16 @@ public struct DataStore {
         return try JSONDecoder().decode([LeaveItem].self, from: data)
     }
 
+    /// Missing file = no holidays; the file appears on first save.
+    public func loadHolidays() -> [HolidayItem] {
+        guard let data = FileManager.default.contents(atPath: paths.holidaysPath) else { return [] }
+        return (try? JSONDecoder().decode([HolidayItem].self, from: data)) ?? []
+    }
+
+    public func saveHolidays(_ holidays: [HolidayItem]) throws {
+        try writeJSON(holidays.sorted { $0.start_date < $1.start_date }, to: paths.holidaysPath)
+    }
+
     public func loadMeta() -> Meta? {
         guard let data = FileManager.default.contents(atPath: paths.metaPath) else { return nil }
         return try? JSONDecoder().decode(Meta.self, from: data)
@@ -97,6 +107,21 @@ public struct DataStore {
     public func saveLogDir(_ dir: String) throws {
         var raw = try ConfigLogic.readRawConfig(atPath: paths.configPath)
         raw["log_dir"] = dir
+        try ConfigLogic.writeRawConfig(raw, toPath: paths.configPath)
+    }
+
+    /// Set the quick-notes folder in config.json (unknown keys preserved).
+    public func saveNotesDir(_ dir: String) throws {
+        var raw = try ConfigLogic.readRawConfig(atPath: paths.configPath)
+        raw["notes_dir"] = dir
+        try ConfigLogic.writeRawConfig(raw, toPath: paths.configPath)
+    }
+
+    /// Merge one meetings-related setting into config.json.
+    public func saveMeetingSetting(key: String, value: String) throws {
+        precondition(["meetings_dir", "scripto_dir", "translate_target"].contains(key))
+        var raw = try ConfigLogic.readRawConfig(atPath: paths.configPath)
+        raw[key] = value
         try ConfigLogic.writeRawConfig(raw, toPath: paths.configPath)
     }
 

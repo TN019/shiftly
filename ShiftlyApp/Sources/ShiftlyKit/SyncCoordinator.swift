@@ -30,12 +30,17 @@ public final class SyncCoordinator {
     private let provider: ScheduleProvider
     private let dataSource: SyncDataSource
     private let applier: ReadbackApplier
+    /// Identifier of the calendar being synced into; persisted in
+    /// sync_state.json so later runs stick to the same calendar even when
+    /// several share the configured name.
+    private let calendarIdentifier: String?
 
     public init(
         store: DataStore,
         stateStore: SyncStateStore,
         calendar: CalendarStore,
-        provider: ScheduleProvider
+        provider: ScheduleProvider,
+        calendarIdentifier: String? = nil
     ) {
         self.store = store
         self.stateStore = stateStore
@@ -43,6 +48,7 @@ public final class SyncCoordinator {
         self.provider = provider
         self.dataSource = SyncDataSource(store: store, provider: provider)
         self.applier = ReadbackApplier(store: store)
+        self.calendarIdentifier = calendarIdentifier
     }
 
     /// Runs the sync; writes meta.json, last_sync_report.json and the
@@ -113,6 +119,7 @@ public final class SyncCoordinator {
         var newState = stateStore.load()
         newState.entries = entries
         newState.last_sync_at = Self.timestamp()
+        newState.calendar_id = calendarIdentifier ?? newState.calendar_id
         try stateStore.save(newState)
         return outcome
     }

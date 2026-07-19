@@ -93,16 +93,30 @@ guard paths.isValid else {
 let store = DataStore(paths: paths)
 let dataSource = SyncDataSource(store: store, provider: PlannerScriptProvider(root: paths.root))
 
+/// Daily-log target date: today when today has a shift, else the most
+/// recent workday within two weeks (today as a last resort).
+func activeLogDate() -> String {
+    let today = todayYMD()
+    guard let from = Calendar.current.date(byAdding: .day, value: -14, to: Date()) else {
+        return today
+    }
+    let df = DateFormatter()
+    df.dateFormat = "yyyy-MM-dd"
+    let shifts = (try? dataSource.plannedShifts(start: df.string(from: from), end: today)) ?? []
+    return shifts.map(\.date).max() ?? today
+}
+
 func logStore() -> WorkLogStore {
-    let dir = (try? store.loadConfig())?.log_dir ?? WorkLogStore.defaultDir
-    return WorkLogStore(rootDir: dir)
+    let config = try? store.loadConfig()
+    let dir = config?.log_dir ?? WorkLogStore.defaultDir
+    return WorkLogStore(rootDir: dir, notesDir: config?.notes_dir)
 }
 
 // MARK: - Commands
 
 let arguments = Array(CommandLine.arguments.dropFirst()).filter { $0 != "--json" }
 guard let command = arguments.first else {
-    fail("usage: shiftly <schedule|swap|leave|shifts|pay|log|report|routine|sync> …", code: 2)
+    fail("usage: shiftly <schedule|swap|leave|holiday|shifts|pay|log|report|routine|sync> …", code: 2)
 }
 let sub = arguments.count > 1 && !arguments[1].hasPrefix("--") ? arguments[1] : ""
 let args = Args(Array(arguments.dropFirst(sub.isEmpty ? 1 : 2)))
@@ -185,6 +199,35 @@ case ("leave", "remove"):
     try store.saveLeaves(leaves)
     emit(["leave": leaves.map { ["start_date": $0.start_date, "end_date": $0.end_date] }])
 
+case ("holiday", "add"):
+    var start = args.date("start")
+    var end = args.value("end") != nil ? args.date("end") : start
+    if end < start { swap(&start, &end) }
+    var holidays = store.loadHolidays()
+    guard !holidays.contains(where: { $0.start_date == start && $0.end_date == end }) else {
+        fail("holiday \(start)..\(end) already exists", code: 2)
+    }
+    holidays.append(HolidayItem(start_date: start, end_date: end, name: args.value("name") ?? ""))
+    try store.saveHolidays(holidays)
+    emit(["holidays": store.loadHolidays().map { ["start_date": $0.start_date, "end_date": $0.end_date, "name": $0.name] }])
+
+case ("holiday", "list"):
+    emit(["holidays": store.loadHolidays().enumerated().map {
+        ["index": $0.offset, "start_date": $0.element.start_date, "end_date": $0.element.end_date, "name": $0.element.name]
+    }])
+
+case ("holiday", "remove"):
+    guard let indexText = args.positional.first ?? args.value("index"), let index = Int(indexText) else {
+        fail("usage: shiftly holiday remove <index>", code: 2)
+    }
+    var holidays = store.loadHolidays()
+    guard holidays.indices.contains(index) else {
+        fail("index \(index) out of range (0..\(holidays.count - 1))", code: 2)
+    }
+    holidays.remove(at: index)
+    try store.saveHolidays(holidays)
+    emit(["holidays": holidays.map { ["start_date": $0.start_date, "end_date": $0.end_date, "name": $0.name] }])
+
 case ("shifts", "list"):
     let shifts = try dataSource.plannedShifts(start: args.date("from"), end: args.date("to"))
     emit(["shifts": shifts.map(shiftJSON)])
@@ -231,7 +274,7 @@ case ("log", "append"):
     guard let text = args.positional.first, !text.isEmpty else {
         fail("usage: shiftly log append \"text\" [--date YYYY-MM-DD]", code: 2)
     }
-    let date = args.value("date") ?? todayYMD()
+    let date = args.value("date") ?? activeLogDate()
     let planned = (try? dataSource.plannedShifts(start: date, end: date)) ?? []
     let days = (try? PlannerScriptProvider(root: paths.root).plannedDays(start: date, end: date)) ?? []
     try logStore().append(
@@ -241,18 +284,18 @@ case ("log", "append"):
         shift: planned.first,
         shiftType: days.first?.shiftType
     )
-    emit(["date": date, "path": logStore().path(for: date)])
+    emit(["date": date, "path": logStore().resolvedPath(for: date)])
 
 case ("log", "show"):
-    let date = args.value("date") ?? todayYMD()
+    let date = args.value("date") ?? activeLogDate()
     guard let content = logStore().read(date: date) else {
         fail("no log for \(date)", code: 3)
     }
     emit(["date": date, "content": content])
 
 case ("log", "path"):
-    let date = args.value("date") ?? todayYMD()
-    emit(["date": date, "path": logStore().path(for: date), "exists": logStore().exists(date: date)])
+    let date = args.value("date") ?? activeLogDate()
+    emit(["date": date, "path": logStore().resolvedPath(for: date), "exists": logStore().exists(date: date)])
 
 case ("report", "hours"):
     let period = args.value("period") ?? "week"
@@ -358,12 +401,17 @@ case ("sync", "now"):
         }
         do {
             let config = try store.loadConfig()
-            let calendar = try EKCalendarStore.locateOrCreateCalendar(named: config.calendar_name, in: ekStore)
+            let stateStore = SyncStateStore(paths: paths)
+            let calendar = try EKCalendarStore.locateOrCreateCalendar(
+                named: config.calendar_name, in: ekStore,
+                preferredID: stateStore.load().calendar_id
+            )
             let coordinator = SyncCoordinator(
                 store: store,
-                stateStore: SyncStateStore(paths: paths),
+                stateStore: stateStore,
                 calendar: EKCalendarStore(eventStore: ekStore, calendar: calendar),
-                provider: PlannerScriptProvider(root: paths.root)
+                provider: PlannerScriptProvider(root: paths.root),
+                calendarIdentifier: calendar.calendarIdentifier
             )
             let outcome = try coordinator.sync()
             emit([

@@ -87,13 +87,22 @@ public struct RoutineRunner {
 
     private let openExecutor: Executor
     private let shellExecutor: Executor
+    private let appSearchPaths: [String]
+
+    public static let defaultAppSearchPaths = [
+        "/Applications",
+        NSHomeDirectory() + "/Applications",
+        "/System/Applications",
+    ]
 
     public init(
         openExecutor: @escaping Executor = RoutineRunner.systemOpen,
-        shellExecutor: @escaping Executor = RoutineRunner.systemShell
+        shellExecutor: @escaping Executor = RoutineRunner.systemShell,
+        appSearchPaths: [String] = RoutineRunner.defaultAppSearchPaths
     ) {
         self.openExecutor = openExecutor
         self.shellExecutor = shellExecutor
+        self.appSearchPaths = appSearchPaths
     }
 
     /// Runs the enabled steps of the list, skipping disabled ones. "sync"
@@ -106,10 +115,35 @@ public struct RoutineRunner {
             .map { runStep($0) }
     }
 
+    /// `open -a` needs the app's exact name, but people type the product
+    /// name ("DingTalk") while the bundle differs ("DingTalkLite.app").
+    /// If no exact match is installed, fall back to the first app whose
+    /// name starts with (then: contains) the value, case-insensitively.
+    public static func resolvedAppName(
+        _ value: String,
+        searchPaths: [String] = RoutineRunner.defaultAppSearchPaths
+    ) -> String {
+        let fm = FileManager.default
+        guard !searchPaths.contains(where: { fm.fileExists(atPath: "\($0)/\(value).app") }) else {
+            return value
+        }
+        let installed = searchPaths
+            .flatMap { (try? fm.contentsOfDirectory(atPath: $0)) ?? [] }
+            .filter { $0.hasSuffix(".app") }
+            .map { String($0.dropLast(4)) }
+            .sorted()
+        let lowered = value.lowercased()
+        if let match = installed.first(where: { $0.lowercased().hasPrefix(lowered) })
+            ?? installed.first(where: { $0.lowercased().contains(lowered) }) {
+            return match
+        }
+        return value
+    }
+
     public func runStep(_ step: RoutineStep) -> RoutineStepResult {
         switch step.kind {
         case "app":
-            var list = ["-a", step.value]
+            var list = ["-a", Self.resolvedAppName(step.value, searchPaths: appSearchPaths)]
             if let args = step.args, !args.isEmpty {
                 // -n: fresh instance so launch args (like Ghostty's
                 // --working-directory) apply even when already running.

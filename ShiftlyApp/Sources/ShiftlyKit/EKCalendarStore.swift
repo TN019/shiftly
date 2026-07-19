@@ -46,13 +46,35 @@ public final class EKCalendarStore: CalendarStore {
         self.calendar = calendar
     }
 
-    /// Finds the calendar by name, creating it in the default source when
-    /// missing.
+    /// Picks which calendar to sync into. The id remembered from the last
+    /// sync wins while its calendar still carries the configured name, so
+    /// duplicate names (or unstable calendar ordering) cannot silently
+    /// switch calendars between runs — which would make every tracked event
+    /// look user-deleted. Returns nil when a new calendar must be created.
+    public static func selectCalendarID(
+        preferredID: String?,
+        name: String,
+        candidates: [(id: String, title: String)]
+    ) -> String? {
+        if let id = preferredID, candidates.contains(where: { $0.id == id && $0.title == name }) {
+            return id
+        }
+        return candidates.first(where: { $0.title == name })?.id
+    }
+
+    /// Finds the calendar by remembered id (see `selectCalendarID`), then by
+    /// name, creating it in the default source when missing.
     public static func locateOrCreateCalendar(
         named name: String,
-        in eventStore: EKEventStore
+        in eventStore: EKEventStore,
+        preferredID: String? = nil
     ) throws -> EKCalendar {
-        if let existing = eventStore.calendars(for: .event).first(where: { $0.title == name }) {
+        let calendars = eventStore.calendars(for: .event)
+        if let id = selectCalendarID(
+            preferredID: preferredID,
+            name: name,
+            candidates: calendars.map { ($0.calendarIdentifier, $0.title) }
+        ), let existing = calendars.first(where: { $0.calendarIdentifier == id }) {
             return existing
         }
         let calendar = EKCalendar(for: .event, eventStore: eventStore)
@@ -68,18 +90,31 @@ public final class EKCalendarStore: CalendarStore {
     }
 
     public func events(in window: DateInterval) throws -> [CalendarEventInfo] {
-        let predicate = eventStore.predicateForEvents(
-            withStart: window.start,
-            end: window.end,
-            calendars: [calendar]
-        )
-        return eventStore.events(matching: predicate).compactMap { event in
+        // EventKit predicates silently cap at ~4 years; the window now spans
+        // the whole schedule history, so fetch in yearly chunks and dedupe
+        // boundary events by id.
+        var raw: [EKEvent] = []
+        var chunkStart = window.start
+        while chunkStart < window.end {
+            let chunkEnd = min(
+                Calendar.current.date(byAdding: .year, value: 1, to: chunkStart) ?? window.end,
+                window.end
+            )
+            let predicate = eventStore.predicateForEvents(
+                withStart: chunkStart, end: chunkEnd, calendars: [calendar]
+            )
+            raw.append(contentsOf: eventStore.events(matching: predicate))
+            chunkStart = chunkEnd
+        }
+        var seen = Set<String>()
+        return raw.compactMap { event in
             guard let id = event.eventIdentifier,
                   let start = event.startDate,
                   let end = event.endDate,
                   // The engine ignores all-day and recurring events; Shiftly
                   // never creates them (design §7).
-                  !event.isAllDay, !event.hasRecurrenceRules else {
+                  !event.isAllDay, !event.hasRecurrenceRules,
+                  seen.insert(id).inserted else {
                 return nil
             }
             return CalendarEventInfo(

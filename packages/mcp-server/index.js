@@ -164,6 +164,44 @@ server.registerTool(
 );
 
 server.registerTool(
+  "list_holidays",
+  {
+    description: "列出全部公共假期区间（带 index，供 remove_holiday 使用；节假日不排班，换班明确换到节假日仍生效）",
+    inputSchema: {},
+  },
+  async () => textResult(await cli(["holiday", "list"])),
+);
+
+server.registerTool(
+  "add_holiday",
+  {
+    description: "新增公共假期区间（含双端，单日可省略 end_date；期间不排班；写入后需 sync_now 才会更新日历）",
+    inputSchema: {
+      start_date: DATE,
+      end_date: DATE.optional().describe("省略 = 单日假期"),
+      name: z.string().optional().describe("假期名称，可省略"),
+    },
+  },
+  async ({ start_date, end_date, name }) => {
+    const args = ["holiday", "add", "--start", start_date];
+    if (end_date) args.push("--end", end_date);
+    if (name) args.push("--name", name);
+    return textResult(await cli(args));
+  },
+);
+
+server.registerTool(
+  "remove_holiday",
+  {
+    description: "删除一条公共假期区间（index 来自 list_holidays；写入后需 sync_now）",
+    inputSchema: {
+      index: z.number().int().min(0),
+    },
+  },
+  async ({ index }) => textResult(await cli(["holiday", "remove", String(index)])),
+);
+
+server.registerTool(
   "pay_report",
   {
     description: "某月工资明细与合计（记账货币计；需先在 App 配置 pay）",

@@ -10,13 +10,11 @@ private let isoParser: DateFormatter = {
 }()
 
 extension ContentView {
-    var overridesSection: some View {
-        card("Overrides") {
+    // MARK: Swap
+
+    var swapSection: some View {
+        card("Swap") {
             HStack(alignment: .center, spacing: 10) {
-                Text("Swap")
-                    .font(.subheadline.weight(.medium))
-                    .frame(width: 48, alignment: .leading)
-                    .foregroundStyle(.secondary)
                 styledDatePicker($model.swapFrom)
                 flowArrowSwap()
                 styledDatePicker($model.swapTo)
@@ -35,11 +33,21 @@ extension ContentView {
                         resignAllFocus()
                     }
             }
+
+            recordsList(
+                upcoming: upcomingSwaps.map(swapRowData),
+                past: pastSwaps.map(swapRowData),
+                pastExpanded: $swapPastExpanded
+            )
+        }
+        .environment(\.isEnabled, !model.isBusy)
+    }
+
+    // MARK: Leave
+
+    var leaveSection: some View {
+        card("Leave") {
             HStack(alignment: .center, spacing: 10) {
-                Text("Leave")
-                    .font(.subheadline.weight(.medium))
-                    .frame(width: 48, alignment: .leading)
-                    .foregroundStyle(.secondary)
                 styledDatePicker($model.leaveStart)
                 flowArrowRange()
                 styledDatePicker($model.leaveEnd)
@@ -59,53 +67,143 @@ extension ContentView {
                     }
             }
 
-            DisclosureGroup(isExpanded: $overridesListExpanded) {
-                if overridesVisibleCount == 0 {
-                    Text("None")
-                        .font(.subheadline)
-                        .foregroundStyle(.tertiary)
-                        .italic()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 6)
-                } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 10) {
-                            ForEach(visibleSwaps) { item in
-                                overrideSwapRow(item: item)
-                            }
-                            ForEach(visibleLeaves) { item in
-                                overrideLeaveRow(item: item)
-                            }
-                        }
-                        .padding(.vertical, 6)
-                    }
-                    .frame(maxHeight: 240)
+            recordsList(
+                upcoming: upcomingLeaves.map(leaveRowData),
+                past: pastLeaves.map(leaveRowData),
+                pastExpanded: $leavePastExpanded
+            )
+        }
+        .environment(\.isEnabled, !model.isBusy)
+    }
+
+    // MARK: Shared record rows
+
+    struct OverrideRowData: Identifiable {
+        let id: UUID
+        let fromText: String
+        let toText: String
+        let arrow: String
+        let deleteHelp: String
+        let onDelete: () -> Void
+    }
+
+    @ViewBuilder
+    private func recordsList(
+        upcoming: [OverrideRowData],
+        past: [OverrideRowData],
+        pastExpanded: Binding<Bool>
+    ) -> some View {
+        HStack(spacing: 8) {
+            Text("Upcoming")
+                .font(.subheadline.weight(.medium))
+            Text("(\(upcoming.count))")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+        }
+        .padding(.top, 2)
+        if upcoming.isEmpty {
+            Text("None")
+                .font(.subheadline)
+                .foregroundStyle(.tertiary)
+                .italic()
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(upcoming) { row in
+                    overrideRow(row)
                 }
+            }
+        }
+        if !past.isEmpty {
+            DisclosureGroup(isExpanded: pastExpanded) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(past) { row in
+                            overrideRow(row)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                }
+                .frame(maxHeight: 220)
             } label: {
                 HStack(spacing: 8) {
-                    Text("Current Overrides")
+                    Text("Past")
                         .font(.subheadline.weight(.medium))
-                    Text("(\(overridesVisibleCount))")
+                    Text("(\(past.count))")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 0)
                 }
             }
-            .padding(.top, 4)
+            .padding(.top, 2)
         }
-        .environment(\.isEnabled, !model.isBusy)
     }
 
-    var visibleSwaps: [SwapItem] {
+    @ViewBuilder
+    private func overrideRow(_ row: OverrideRowData) -> some View {
+        HStack(spacing: 8) {
+            Text(row.fromText)
+                .font(.system(.body, design: .rounded).weight(.medium).monospacedDigit())
+            Image(systemName: row.arrow)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.tertiary)
+            Text(row.toText)
+                .font(.system(.body, design: .rounded).weight(.medium).monospacedDigit())
+            Spacer()
+            Button(role: .destructive) {
+                row.onDelete()
+            } label: {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.borderless)
+            .help(row.deleteHelp)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.primary.opacity(0.05))
+        )
+    }
+
+    private func swapRowData(_ item: SwapItem) -> OverrideRowData {
+        OverrideRowData(
+            id: item.id,
+            fromText: displayDate(fromISO: item.from_date),
+            toText: displayDate(fromISO: item.to_date),
+            arrow: "arrow.right",
+            deleteHelp: L("Remove swap"),
+            onDelete: { [id = item.id] in model.deleteSwap(id: id) }
+        )
+    }
+
+    private func leaveRowData(_ item: LeaveItem) -> OverrideRowData {
+        OverrideRowData(
+            id: item.id,
+            fromText: displayDate(fromISO: item.start_date),
+            toText: displayDate(fromISO: item.end_date),
+            arrow: "arrow.left.and.line.vertical.and.arrow.right",
+            deleteHelp: L("Remove leave"),
+            onDelete: { [id = item.id] in model.deleteLeave(id: id) }
+        )
+    }
+
+    // MARK: Partitioning
+
+    private var upcomingSwaps: [SwapItem] {
         model.swaps.filter { !isSwapPast($0) }
     }
 
-    var visibleLeaves: [LeaveItem] {
+    private var pastSwaps: [SwapItem] {
+        model.swaps.filter(isSwapPast).sorted { max($0.from_date, $0.to_date) > max($1.from_date, $1.to_date) }
+    }
+
+    private var upcomingLeaves: [LeaveItem] {
         model.leaves.filter { !isLeavePast($0) }
     }
 
-    var overridesVisibleCount: Int {
-        visibleSwaps.count + visibleLeaves.count
+    private var pastLeaves: [LeaveItem] {
+        model.leaves.filter(isLeavePast).sorted { $0.end_date > $1.end_date }
     }
 
     private func isSwapPast(_ item: SwapItem) -> Bool {
@@ -118,71 +216,7 @@ extension ContentView {
         return end < startOfToday
     }
 
-    @ViewBuilder
-    private func overrideSwapRow(item: SwapItem) -> some View {
-        HStack(spacing: 8) {
-            Text("Swap")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Capsule().fill(Color.primary.opacity(0.08)))
-            Text(displayDate(fromISO: item.from_date))
-                .font(.system(.body, design: .rounded).weight(.medium).monospacedDigit())
-            Image(systemName: "arrow.right")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.tertiary)
-            Text(displayDate(fromISO: item.to_date))
-                .font(.system(.body, design: .rounded).weight(.medium).monospacedDigit())
-            Spacer()
-            Button(role: .destructive) {
-                model.deleteSwap(id: item.id)
-            } label: {
-                Image(systemName: "trash")
-            }
-            .buttonStyle(.borderless)
-            .help("Remove swap")
-        }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.primary.opacity(0.05))
-        )
-    }
-
-    @ViewBuilder
-    private func overrideLeaveRow(item: LeaveItem) -> some View {
-        HStack(spacing: 8) {
-            Text("Leave")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Capsule().fill(Color.primary.opacity(0.08)))
-            Text(displayDate(fromISO: item.start_date))
-                .font(.system(.body, design: .rounded).weight(.medium).monospacedDigit())
-            Image(systemName: "arrow.left.and.line.vertical.and.arrow.right")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.tertiary)
-            Text(displayDate(fromISO: item.end_date))
-                .font(.system(.body, design: .rounded).weight(.medium).monospacedDigit())
-            Spacer()
-            Button(role: .destructive) {
-                model.deleteLeave(id: item.id)
-            } label: {
-                Image(systemName: "trash")
-            }
-            .buttonStyle(.borderless)
-            .help("Remove leave")
-        }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.primary.opacity(0.05))
-        )
-    }
+    // MARK: Bits
 
     private func flowArrowSwap() -> some View {
         Image(systemName: "arrow.right")
@@ -200,7 +234,7 @@ extension ContentView {
             .background(Circle().fill(Color.primary.opacity(0.08)))
     }
 
-    private func displayDate(fromISO iso: String) -> String {
+    func displayDate(fromISO iso: String) -> String {
         guard let d = isoParser.date(from: iso) else { return iso }
         return d.formatted(date: .abbreviated, time: .omitted)
     }
