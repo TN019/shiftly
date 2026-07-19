@@ -68,36 +68,45 @@ extension ContentView {
                 Spacer(minLength: 0)
             }
 
-            DisclosureGroup(isExpanded: $holidaysListExpanded) {
-                if upcomingHolidays.isEmpty {
-                    Text("None")
-                        .font(.subheadline)
-                        .foregroundStyle(.tertiary)
-                        .italic()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 6)
-                } else {
+            if upcomingHolidays.isEmpty && pastHolidays.isEmpty {
+                Text("None")
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
+                    .italic()
+            }
+            if !upcomingHolidays.isEmpty {
+                Text("Upcoming")
+                    .font(.subheadline.weight(.medium))
+                    .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(upcomingHolidays) { item in
+                        holidayRow(item: item)
+                    }
+                }
+            }
+            if !pastHolidays.isEmpty {
+                DisclosureGroup(isExpanded: $holidaysPastExpanded) {
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 10) {
-                            ForEach(upcomingHolidays) { item in
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(pastHolidays) { item in
                                 holidayRow(item: item)
                             }
                         }
                         .padding(.vertical, 6)
                     }
-                    .frame(maxHeight: 240)
+                    .frame(maxHeight: 220)
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("Past")
+                            .font(.subheadline.weight(.medium))
+                        Text("(\(pastHolidays.count))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 0)
+                    }
                 }
-            } label: {
-                HStack(spacing: 8) {
-                    Text("Upcoming Holidays")
-                        .font(.subheadline.weight(.medium))
-                    Text("(\(upcomingHolidays.count))")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Spacer(minLength: 0)
-                }
+                .padding(.top, 2)
             }
-            .padding(.top, 4)
         }
         .environment(\.isEnabled, !model.isBusy)
     }
@@ -107,6 +116,15 @@ extension ContentView {
             guard let end = localDateFromISO(item.end_date) else { return false }
             return end >= startOfToday
         }
+    }
+
+    private var pastHolidays: [HolidayItem] {
+        model.holidays
+            .filter { item in
+                guard let end = localDateFromISO(item.end_date) else { return true }
+                return end < startOfToday
+            }
+            .sorted { $0.start_date > $1.start_date }
     }
 
     private func holidayRangeText(_ item: HolidayItem) -> String {

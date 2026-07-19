@@ -150,17 +150,32 @@ public struct WorkLogStore {
         return "\(fileName(for: date).dropLast(3)) | \(safe).md"
     }
 
-    /// Create a quick note (frontmatter only, body is the user's) and
-    /// return its path; an existing note of the same day + title is
-    /// returned untouched.
+    /// Create a quick note (frontmatter + optional body) and return its
+    /// path; an existing note of the same day + title is returned
+    /// untouched.
     @discardableResult
-    public func createNote(title: String, date: String) throws -> String {
+    public func createNote(title: String, date: String, body: String = "") throws -> String {
         let path = "\(rootDir)/\(Self.noteFileName(date: date, title: title))"
         guard !FileManager.default.fileExists(atPath: path) else { return path }
         try FileManager.default.createDirectory(atPath: rootDir, withIntermediateDirectories: true)
-        let content = "---\ndate: \(date)\ntags: []\n---\n\n"
+        var content = "---\ndate: \(date)\ntags: []\n---\n\n"
+        if !body.isEmpty {
+            content += body.hasSuffix("\n") ? body : body + "\n"
+        }
         try Data(content.utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
         return path
+    }
+
+    /// Quick notes whose title or content matches, newest first.
+    public func searchNotes(query: String) -> [NoteRef] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return [] }
+        return notes().filter { note in
+            if note.title.localizedCaseInsensitiveContains(needle) { return true }
+            guard let data = FileManager.default.contents(atPath: note.path),
+                  let content = String(data: data, encoding: .utf8) else { return false }
+            return content.localizedCaseInsensitiveContains(needle)
+        }
     }
 
     /// All quick notes, newest date first (title as tiebreaker).

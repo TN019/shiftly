@@ -33,7 +33,9 @@ struct ContentView: View {
     @ObservedObject var model: AppModel
     @FocusState var timeFocus: TimeField?
     @FocusState var historySearchFocused: Bool
-    @State var overridesListExpanded = false
+    @State var swapPastExpanded = false
+    @State var leavePastExpanded = false
+    @State var holidaysPastExpanded = false
     @State var historyExpanded = false
     @State var historyDateSearch = ""
     @State var historyPeriod: HistoryPeriodFilter = .all
@@ -56,13 +58,7 @@ struct ContentView: View {
     @AppStorage("shiftly.payDisplayCurrency") var payDisplayCurrency = "AUD"
     @State var paySelectedMonth: String? = nil
     @State var logQuickText = ""
-    @State var quickNoteTitle = ""
-    @State var logShowRaw = false
     @State var logSearchQuery = ""
-    @State var logSearchUseRange = false
-    @State var logSearchFrom = Calendar.current.date(byAdding: .month, value: -3, to: Date()) ?? Date()
-    @State var logSearchTo = Date()
-    @State var logSearchRan = false
     @State var importCalendarID = ""
     @State var todaySwapTarget = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
     @State private var showResetConfirm = false
@@ -244,13 +240,14 @@ struct ContentView: View {
         routineCard
         adjustTodayCard
         syncReportSection
-        actions
     }
 
     @ViewBuilder
     private var shiftPage: some View {
+        actions
         weeklySection
-        overridesSection
+        swapSection
+        leaveSection
         holidaysSection
     }
 

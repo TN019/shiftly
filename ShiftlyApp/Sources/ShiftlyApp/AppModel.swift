@@ -61,6 +61,7 @@ final class AppModel: ObservableObject {
     @Published var todayLogContent: String?
     /// Standalone quick notes (`dd-mm-yy | title.md`), newest first.
     @Published var quickNotes: [WorkLogStore.NoteRef] = []
+    @Published var noteSearchResults: [WorkLogStore.NoteRef] = []
     /// Days with a log file in the calendar's displayed month.
     @Published var monthLogDates: Set<String> = []
     @Published var logSearchResults: [WorkLogStore.SearchHit] = []
@@ -398,23 +399,79 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Create a standalone quick note (`dd-mm-yy | title.md`) and open it
-    /// in the default editor.
-    func createQuickNote(title: String) {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+    // MARK: In-app editor
+
+    /// Open the in-app editor on the active daily log (created on demand).
+    func editDailyLog() {
         guard logDirExists else {
             statusMessage = L("Create the log folder first.")
             return
         }
+        let date = activeLogDate
+        Task { @MainActor in
+            guard let path = await ensureLog(date: date) else {
+                statusMessage = L("Could not create today's log.")
+                return
+            }
+            todayLogContent = logStore.read(date: date)
+            LogEditorWindow.present(path: path, title: LF("Daily Log — %@", date), model: self)
+        }
+    }
+
+    /// Open the in-app editor on an existing note or log file.
+    func editFile(path: String, title: String) {
+        LogEditorWindow.present(path: path, title: title, model: self)
+    }
+
+    /// Open the in-app editor in new-note mode (also the widget entry).
+    func newQuickNote() {
+        guard logDirExists else {
+            statusMessage = L("Create the log folder first.")
+            return
+        }
+        LogEditorWindow.presentNewNote(model: self)
+    }
+
+    /// Create the quick-note file for the editor's first save.
+    /// Returns the path, or nil on failure.
+    func createQuickNoteFile(title: String, body: String) -> String? {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, logDirExists else { return nil }
         noteOwnWrite()
         do {
-            let path = try logStore.createNote(title: trimmed, date: Self.todayYMD())
+            let path = try logStore.createNote(title: trimmed, date: Self.todayYMD(), body: body)
             quickNotes = logStore.notes()
-            NSWorkspace.shared.open(URL(fileURLWithPath: path))
+            return path
         } catch {
             statusMessage = LF("Note create failed: %@", error.localizedDescription)
+            return nil
         }
+    }
+
+    /// Persist editor content and refresh whatever shows the file.
+    func saveEditorContent(_ content: String, at path: String) -> Bool {
+        noteOwnWrite()
+        do {
+            try Data(content.utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
+            refreshLogState()
+            return true
+        } catch {
+            statusMessage = LF("Save failed: %@", error.localizedDescription)
+            return false
+        }
+    }
+
+    /// Open a file in VS Code when installed, the default editor otherwise.
+    func openInVSCode(path: String) {
+        let candidates = ["Visual Studio Code", "VSCodium", "Code"]
+        for name in candidates
+        where FileManager.default.fileExists(atPath: "/Applications/\(name).app") {
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            proc.arguments = ["-a", name, path]
+            if (try? proc.run()) != nil { return }
+        }
+        NSWorkspace.shared.open(URL(fileURLWithPath: path))
     }
 
     // MARK: Pay
@@ -569,12 +626,22 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func searchLogs(query: String, from: String?, to: String?) {
+    func searchLogs(query: String, from: String? = nil, to: String? = nil) {
         let dir = logDir
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            logSearchResults = []
+            noteSearchResults = []
+            return
+        }
         Task { @MainActor in
-            logSearchResults = await Task.detached(priority: .utility) {
-                WorkLogStore(rootDir: dir).search(query: query, from: from, to: to)
+            let (logs, notes) = await Task.detached(priority: .utility) { () -> ([WorkLogStore.SearchHit], [WorkLogStore.NoteRef]) in
+                let store = WorkLogStore(rootDir: dir)
+                return (store.search(query: trimmed, from: from, to: to),
+                        store.searchNotes(query: trimmed))
             }.value
+            logSearchResults = logs
+            noteSearchResults = notes
         }
     }
 

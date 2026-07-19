@@ -416,3 +416,20 @@
 "No notes yet." = "还没有笔记。";
 "Note create failed: %@" = "笔记创建失败：%@";
 "Daily Markdown logs live in a folder you own — one file per shift day (dd-mm-yy.md) with the shift pre-filled, plus standalone quick notes (dd-mm-yy | title.md), editable with any app." = "Markdown 日志存放在你自己的文件夹——每个班一个文件（dd-mm-yy.md，预填班次信息），另有独立快速笔记（dd-mm-yy | 标题.md），任何 app 均可编辑。";
+
+/* Log page redesign + in-app editor */
+"Edit" = "编辑";
+"New Note" = "新建笔记";
+"Open in VS Code" = "在 VS Code 打开";
+"Open in Shiftly" = "在 Shiftly 内打开";
+"Saved." = "已保存。";
+"Save failed." = "保存失败。";
+"no shift today — last workday" = "今天无班——记入上一个工作日";
+"Quick entry — appended with a timestamp" = "快速打卡——带时间戳追加";
+"No log for this day yet — Edit opens the editor, or add a quick entry above." = "这一天还没有日志——点「编辑」打开编辑器，或在上方快速打卡。";
+"Standalone notes — dd-mm-yy | title.md" = "独立笔记——dd-mm-yy | 标题.md";
+"Search logs and notes as you type" = "输入即搜索日志与笔记";
+"Daily Logs" = "工作日志";
+"Daily Log — %@" = "工作日志 — %@";
+"Past" = "过往";
+"Upcoming" = "即将到来";
