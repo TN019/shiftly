@@ -35,7 +35,7 @@ extension ContentView {
                             .monospacedDigit()
                             .foregroundStyle(.red)
                     } else {
-                        Text("Audio lands in a timestamped folder; Scripto adds the transcript next to it.")
+                        Text("Records your mic plus the Mac's system audio (calls, meetings); Scripto adds the transcript next to it.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

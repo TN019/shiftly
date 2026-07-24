@@ -25,6 +25,10 @@ import Testing
         let folder = (audio as NSString).deletingLastPathComponent
         FileManager.default.createFile(atPath: folder + "/19-07-26.en.srt", contents: Data("x".utf8))
         FileManager.default.createFile(atPath: folder + "/19-07-26.zh.srt", contents: Data("y".utf8))
+        // Recording scratch (hidden system-audio track) must never be
+        // picked up as the meeting's audio or subtitles.
+        FileManager.default.createFile(atPath: folder + "/.19-07-26.system.m4a", contents: Data([0]))
+        FileManager.default.createFile(atPath: folder + "/.junk.srt", contents: Data("z".utf8))
         _ = try store.newRecordingPath(date: "2026-07-20", timeHHMM: "09:05")
         try FileManager.default.createDirectory(
             atPath: root + "/not a meeting", withIntermediateDirectories: true

@@ -64,6 +64,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <string>Shiftly keeps your Shifts calendar in sync with your work schedule.</string>
   <key>NSMicrophoneUsageDescription</key>
   <string>Shiftly records meeting audio into your meetings folder when you press Record.</string>
+  <key>NSAudioCaptureUsageDescription</key>
+  <string>Shiftly also captures the Mac's system audio while recording a meeting, so the other side of an online call is in the recording even when you wear headphones.</string>
   <key>CFBundleURLTypes</key>
   <array>
     <dict>

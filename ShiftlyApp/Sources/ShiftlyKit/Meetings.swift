@@ -77,7 +77,10 @@ public struct MeetingStore {
         return names.compactMap { name -> Meeting? in
             guard let (date, time) = Self.parseFolderName(name) else { return nil }
             let folder = "\(rootDir)/\(name)"
-            let files = (try? fm.contentsOfDirectory(atPath: folder)) ?? []
+            // Dotfiles are recording scratch (hidden system-audio track,
+            // in-flight mix) — never a meeting's audio or subtitles.
+            let files = ((try? fm.contentsOfDirectory(atPath: folder)) ?? [])
+                .filter { !$0.hasPrefix(".") }
             let audio = files.first { $0.hasSuffix(".mp4") || $0.hasSuffix(".m4a") }
             var subtitles: [String: String] = [:]
             for file in files where file.hasSuffix(".srt") {
