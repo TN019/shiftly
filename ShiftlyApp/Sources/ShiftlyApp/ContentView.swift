@@ -658,8 +658,22 @@ struct ContentView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 0)
+                if model.scriptoDir.isEmpty {
+                    Button {
+                        model.installScripto()
+                    } label: {
+                        if model.scriptoInstalling {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Text("Install automatically")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(model.scriptoInstalling)
+                }
                 Button("Change…") { chooseScriptoFolder() }
                     .buttonStyle(.bordered)
+                    .disabled(model.scriptoInstalling)
             }
             HStack(spacing: 10) {
                 Text("Translate to").font(.caption).foregroundStyle(.secondary)
@@ -675,7 +689,7 @@ struct ContentView: View {
                 .frame(width: 110)
                 Spacer(minLength: 0)
             }
-            Text("Transcribe / Translate run Scripto's CLI headlessly (uv run scripto-cli); subtitles land next to each recording.")
+            Text("Transcribe / Translate run Scripto's CLI headlessly (uv run scripto-cli); subtitles land next to each recording. Install automatically clones Scripto from GitHub and sets the folder for you (needs git; transcription needs uv).")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }

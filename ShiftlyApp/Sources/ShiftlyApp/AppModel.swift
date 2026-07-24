@@ -89,6 +89,8 @@ final class AppModel: ObservableObject {
     @Published var recordingSeconds = 0
     /// Meeting folders with a Scripto run in flight.
     @Published var scriptoBusy: Set<String> = []
+    /// One-click Scripto install (clone + uv sync) in flight.
+    @Published var scriptoInstalling = false
     private var audioRecorder: AVAudioRecorder?
     /// SystemAudioRecorder on macOS 15+; typed AnyObject so the stored
     /// property compiles against the macOS 13 deployment target.
@@ -631,26 +633,7 @@ final class AppModel: ObservableObject {
                 if translate {
                     command += " --translate --target \(target)"
                 }
-                let proc = Process()
-                proc.executableURL = URL(fileURLWithPath: "/bin/zsh")
-                proc.arguments = ["-lc", command]
-                let errPipe = Pipe()
-                proc.standardError = errPipe
-                proc.standardOutput = Pipe()
-                do {
-                    try proc.run()
-                    proc.waitUntilExit()
-                    if proc.terminationStatus == 0 {
-                        return (true, "")
-                    }
-                    let err = String(
-                        data: errPipe.fileHandleForReading.readDataToEndOfFile(),
-                        encoding: .utf8
-                    )?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                    return (false, err.split(separator: "\n").last.map(String.init) ?? "exit \(proc.terminationStatus)")
-                } catch {
-                    return (false, error.localizedDescription)
-                }
+                return Self.runShell(command)
             }.value
             scriptoBusy.remove(meeting.folder)
             refreshMeetings()
@@ -663,6 +646,94 @@ final class AppModel: ObservableObject {
     /// Single-quote a string for /bin/zsh -lc.
     nonisolated static func shellQuote(_ value: String) -> String {
         "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    /// Runs a command through a login zsh (so brew-installed tools like uv
+    /// are on PATH). Returns success plus the last stderr line on failure.
+    /// stderr is drained before waiting so a chatty command can't deadlock
+    /// the pipe; stdout is discarded.
+    nonisolated static func runShell(_ command: String) -> (ok: Bool, message: String) {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        proc.arguments = ["-lc", command]
+        let errPipe = Pipe()
+        proc.standardError = errPipe
+        proc.standardOutput = FileHandle.nullDevice
+        do {
+            try proc.run()
+            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+            proc.waitUntilExit()
+            if proc.terminationStatus == 0 {
+                return (true, "")
+            }
+            let err = String(data: errData, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return (false, err.split(separator: "\n").last.map(String.init) ?? "exit \(proc.terminationStatus)")
+        } catch {
+            return (false, error.localizedDescription)
+        }
+    }
+
+    private enum ScriptoInstallStep {
+        case ready
+        case needsUV
+        case syncFailed(String)
+        case failed(String)
+    }
+
+    /// One-click Scripto install: clone the repo next to a Shiftly checkout
+    /// (or into Application Support), pre-warm the Python env with
+    /// `uv sync`, and point scripto_dir at the result. An existing checkout
+    /// at the destination is adopted instead of re-cloned.
+    func installScripto() {
+        guard !scriptoInstalling else { return }
+        let target = ScriptoInstall.targetDirectory(near: Bundle.main.bundlePath)
+        if ScriptoInstall.looksLikeCheckout(target) {
+            adoptScriptoDir(URL(fileURLWithPath: target))
+            return
+        }
+        scriptoInstalling = true
+        statusMessage = L("Installing Scripto…")
+        Task { @MainActor in
+            let step = await Task.detached(priority: .userInitiated) { () -> ScriptoInstallStep in
+                let fm = FileManager.default
+                let parent = (target as NSString).deletingLastPathComponent
+                do {
+                    try fm.createDirectory(atPath: parent, withIntermediateDirectories: true)
+                } catch {
+                    return .failed(error.localizedDescription)
+                }
+                let existedBefore = fm.fileExists(atPath: target)
+                let clone = Self.runShell(
+                    "git clone \(Self.shellQuote(ScriptoInstall.repoURL)) \(Self.shellQuote(target))"
+                )
+                guard clone.ok else {
+                    // git normally cleans up after itself; only sweep a
+                    // directory this run created.
+                    if !existedBefore { try? fm.removeItem(atPath: target) }
+                    return .failed(clone.message)
+                }
+                guard Self.runShell("command -v uv").ok else { return .needsUV }
+                // Pre-warm the env so the first Transcribe doesn't silently
+                // stall for minutes downloading dependencies.
+                let sync = Self.runShell("cd \(Self.shellQuote(target)) && uv sync")
+                return sync.ok ? .ready : .syncFailed(sync.message)
+            }.value
+            scriptoInstalling = false
+            switch step {
+            case .failed(let message):
+                statusMessage = LF("Scripto install failed: %@", message)
+            case .ready:
+                adoptScriptoDir(URL(fileURLWithPath: target))
+                statusMessage = L("Scripto is ready.")
+            case .needsUV:
+                adoptScriptoDir(URL(fileURLWithPath: target))
+                statusMessage = L("Scripto cloned. Install uv (brew install uv) before transcribing.")
+            case .syncFailed(let message):
+                adoptScriptoDir(URL(fileURLWithPath: target))
+                statusMessage = LF("Scripto cloned, but uv sync failed: %@", message)
+            }
+        }
     }
 
     func deleteMeeting(_ meeting: MeetingStore.Meeting) {

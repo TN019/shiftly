@@ -473,7 +473,13 @@
 "Scripto folder" = "Scripto 目录";
 "Not set" = "未设置";
 "Translate to" = "翻译目标";
-"Transcribe / Translate run Scripto's CLI headlessly (uv run scripto-cli); subtitles land next to each recording." = "转录/翻译 通过 Scripto 的命令行无界面运行（uv run scripto-cli）；字幕文件生成在每段录音旁边。";
+"Transcribe / Translate run Scripto's CLI headlessly (uv run scripto-cli); subtitles land next to each recording. Install automatically clones Scripto from GitHub and sets the folder for you (needs git; transcription needs uv)." = "转录/翻译 通过 Scripto 的命令行无界面运行（uv run scripto-cli）；字幕文件生成在每段录音旁边。「一键安装」会从 GitHub 克隆 Scripto 并自动设置目录（需要 git；转录需要 uv）。";
+"Install automatically" = "一键安装";
+"Installing Scripto…" = "正在安装 Scripto…";
+"Scripto is ready." = "Scripto 已就绪。";
+"Scripto cloned. Install uv (brew install uv) before transcribing." = "Scripto 已克隆。转录前请先安装 uv（brew install uv）。";
+"Scripto cloned, but uv sync failed: %@" = "Scripto 已克隆，但 uv sync 失败：%@";
+"Scripto install failed: %@" = "Scripto 安装失败：%@";
 "Choose the folder for meeting recordings." = "选择存放会议录音的文件夹。";
 "Choose your Scripto checkout (the folder with pyproject.toml)." = "选择你的 Scripto 项目目录（含 pyproject.toml）。";
 "No transcript yet." = "还没有转录。";

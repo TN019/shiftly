@@ -86,3 +86,42 @@ import Testing
         #expect(SRT.timestamp("nonsense") == nil)
     }
 }
+
+@Suite struct ScriptoInstallTests {
+    @Test func clonesNextToAShiftlyCheckout() throws {
+        let fm = FileManager.default
+        let base = fm.temporaryDirectory
+            .appendingPathComponent("scripto_install_\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: base) }
+        let repo = base.appendingPathComponent("dev/shiftly")
+        try fm.createDirectory(
+            at: repo.appendingPathComponent(".git"), withIntermediateDirectories: true
+        )
+        try fm.createDirectory(
+            at: repo.appendingPathComponent("ShiftlyApp"), withIntermediateDirectories: true
+        )
+        fm.createFile(
+            atPath: repo.appendingPathComponent("ShiftlyApp/Package.swift").path,
+            contents: Data()
+        )
+        let bundle = repo.appendingPathComponent("dist/Shiftly.app/Contents/MacOS").path
+        let target = ScriptoInstall.targetDirectory(near: bundle, fileManager: fm)
+        #expect(target == base.appendingPathComponent("dev/scripto").standardizedFileURL.path)
+    }
+
+    @Test func fallsBackToApplicationSupport() {
+        let target = ScriptoInstall.targetDirectory(near: "/Applications/Shiftly.app")
+        #expect(target.hasSuffix("/Library/Application Support/Shiftly/scripto"))
+    }
+
+    @Test func detectsACheckoutByPyproject() throws {
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory
+            .appendingPathComponent("scripto_checkout_\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: dir) }
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        #expect(!ScriptoInstall.looksLikeCheckout(dir.path))
+        fm.createFile(atPath: dir.appendingPathComponent("pyproject.toml").path, contents: Data())
+        #expect(ScriptoInstall.looksLikeCheckout(dir.path))
+    }
+}
