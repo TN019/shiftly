@@ -447,7 +447,9 @@
 "Meetings" = "会议";
 "Record a meeting" = "录制会议";
 "Recording…" = "录音中…";
-"Audio lands in a timestamped folder; Scripto adds the transcript next to it." = "音频存入按时间戳命名的文件夹；Scripto 的转录文件会生成在旁边。";
+"Records your mic plus the Mac's system audio (calls, meetings); Scripto adds the transcript next to it." = "同时录制麦克风和 Mac 系统声音（通话、会议）；Scripto 的转录文件会生成在旁边。";
+"Recording… (system audio unavailable, mic only)" = "录音中…（系统声音不可用，仅麦克风）";
+"Saving recording…" = "正在保存录音…";
 "No meetings yet — hit record." = "还没有会议——点击录音开始。";
 "Transcribe" = "转录";
 "Translate" = "翻译";

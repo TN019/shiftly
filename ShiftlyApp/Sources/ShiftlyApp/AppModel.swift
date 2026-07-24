@@ -90,6 +90,9 @@ final class AppModel: ObservableObject {
     /// Meeting folders with a Scripto run in flight.
     @Published var scriptoBusy: Set<String> = []
     private var audioRecorder: AVAudioRecorder?
+    /// SystemAudioRecorder on macOS 15+; typed AnyObject so the stored
+    /// property compiles against the macOS 13 deployment target.
+    private var systemAudio: AnyObject?
     private var recordTimer: Timer?
 
     struct ImportCalendar: Identifiable, Equatable {
@@ -539,6 +542,24 @@ final class AppModel: ObservableObject {
                 return
             }
             audioRecorder = recorder
+            // System audio side-track (macOS 15+): captures the far side of
+            // online meetings even over headphones; mixed in on stop. Any
+            // failure (permission declined, tap error) degrades to mic-only.
+            var systemAudioOK = false
+            if #available(macOS 15.0, *) {
+                let sysRecorder = SystemAudioRecorder()
+                do {
+                    try sysRecorder.start(
+                        writingTo: SystemAudioRecorder.systemTrackURL(
+                            forMic: URL(fileURLWithPath: path))
+                    )
+                    systemAudio = sysRecorder
+                    systemAudioOK = true
+                } catch {
+                    sysRecorder.stop()
+                    systemAudio = nil
+                }
+            }
             isRecording = true
             refreshNextShift() // widget snapshot picks up the recording state
             recordingSeconds = 0
@@ -548,7 +569,9 @@ final class AppModel: ObservableObject {
                     self.recordingSeconds += 1
                 }
             }
-            statusMessage = L("Recording…")
+            statusMessage = systemAudioOK
+                ? L("Recording…")
+                : L("Recording… (system audio unavailable, mic only)")
         } catch {
             statusMessage = LF("Could not start recording: %@", error.localizedDescription)
         }
@@ -556,14 +579,33 @@ final class AppModel: ObservableObject {
 
     func stopRecording() {
         guard isRecording else { return }
+        let micURL = audioRecorder?.url
         audioRecorder?.stop()
         audioRecorder = nil
         recordTimer?.invalidate()
         recordTimer = nil
         isRecording = false
-        refreshMeetings()
         refreshNextShift() // widget snapshot drops the recording state
-        statusMessage = L("Recording saved.")
+        if #available(macOS 15.0, *),
+           let sysRecorder = systemAudio as? SystemAudioRecorder, let micURL {
+            sysRecorder.stop()
+            systemAudio = nil
+            // The meeting appears in the list only once the mix is done, so
+            // a transcription can never race against the file swap.
+            statusMessage = L("Saving recording…")
+            Task { @MainActor in
+                _ = await SystemAudioRecorder.mix(
+                    mic: micURL,
+                    system: SystemAudioRecorder.systemTrackURL(forMic: micURL)
+                )
+                refreshMeetings()
+                statusMessage = L("Recording saved.")
+            }
+        } else {
+            systemAudio = nil
+            refreshMeetings()
+            statusMessage = L("Recording saved.")
+        }
     }
 
     /// Run Scripto headlessly on a meeting's audio; the SRT lands next to
